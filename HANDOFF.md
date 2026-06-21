@@ -139,7 +139,7 @@ MiniBrowser/
 
 | 模块 | 状态 | 关键文件 |
 |---|---|---|
-| 主页/新标签页（搜索框+盾牌+二维码+品牌宫格+下拉搜索） | ✅ | `Home/HomeView.swift` |
+| 主页/新标签页（双页：宫格 + 网址导航目录；内联搜索；盾牌+二维码） | ✅ | `Home/HomeView.swift`, `Home/NavDirectory.swift` |
 | 搜索输入态（建议/剪贴板/历史，URL vs 关键词识别） | ✅ | `Home/SearchOverlay.swift`, `WebEngine.normalize` |
 | 网页浏览（真实 WKWebView、地址栏、进度、刷新/停止） | ✅ 真实 | `Browser/BrowserView.swift`, `Browser/WebEngine.swift` |
 | 底部工具栏（后退/前进/菜单/标签/主页，真实前进后退历史） | ✅ | `Browser/BottomToolbar.swift` |

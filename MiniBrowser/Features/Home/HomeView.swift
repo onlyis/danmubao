@@ -6,6 +6,7 @@ struct HomeView: View {
     @EnvironmentObject var vm: BrowserViewModel
     @State private var searching = false
     @State private var query = ""
+    @State private var homePage = 0
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
 
@@ -24,19 +25,30 @@ struct HomeView: View {
                 engineRow
                 SearchSuggestionList(query: query, onPick: submit)
             } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: Theme.Spacing.l) {
-                        ForEach(vm.quickLinks) { link in
-                            QuickLinkCell(link: link, lightText: lightText)
-                        }
-                        AddQuickLinkCell()
-                    }
-                    .padding(.horizontal, Theme.Spacing.l)
-                    Spacer(minLength: 80)
+                // 双页：常用宫格 + 网址导航目录，底部页面指示点
+                TabView(selection: $homePage) {
+                    quickLinksPage.tag(0)
+                    NavDirectoryView(lightText: lightText).tag(1)
                 }
-                .scrollDismissesKeyboard(.immediately)
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .indexViewStyle(.page(backgroundDisplayMode: .interactive))
+                .frame(maxHeight: .infinity)
             }
         }
+    }
+
+    private var quickLinksPage: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: Theme.Spacing.l) {
+                ForEach(vm.quickLinks) { link in
+                    QuickLinkCell(link: link, lightText: lightText)
+                }
+                AddQuickLinkCell()
+            }
+            .padding(.horizontal, Theme.Spacing.l)
+            Spacer(minLength: 80)
+        }
+        .scrollDismissesKeyboard(.immediately)
     }
 
     /// 搜索引擎图标行：点击切换默认引擎，随后输入即用该引擎搜索。
