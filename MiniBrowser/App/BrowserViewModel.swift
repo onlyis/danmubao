@@ -83,6 +83,9 @@ final class BrowserViewModel: ObservableObject {
         case bookmarks, history, downloads, files, settings
         case reading, imageViewer, comic, toolbox, qrScanner, reader, translate
         case jsExtensions, devtools, cookies, gestures, plugins, searchEngine
+        case readingList
+
+// 2) routeView(_:) 映射加 case（精确替换 RootView.swift）
         var id: String { String(describing: self) }
     }
     @Published var route: Route?
@@ -497,6 +500,10 @@ case "识别图中码": qrAutoPickPhoto = true; route = .qrScanner
         case "拦截跳转": toggleBlockRedirects(); return false
         // 查看站点证书（动作型，关闭宿主弹层后弹证书 sheet）
         case "查看证书", "查看站点证书": viewCertificate()
+        case "媒体嗅探": openMediaSniffer()
+
+case "稍后读": saveToReadingList()
+case "阅读列表": route = .readingList
         default:
             showToast("「\(title)」暂未实现", symbol: "hammer")
             return false
@@ -915,6 +922,70 @@ private static func requestBingSuggestions(_ keyword: String) async -> [String] 
         print("fetchSuggestions failed keyword=\(keyword) url=\(url) error=\(error)")
         #endif
         return []
+    }
+}
+
+    // MARK: - 媒体嗅探（页面内 <video>/<audio> 地址收集 + 下载/复制/分享）
+    /// 当前页面嗅探到的媒体命中（由 WebEngine.sniffMedia 填充）。
+    @Published var mediaHits: [MediaHit] = []
+    /// 媒体嗅探结果页呈现标志（RootView 以 .sheet 呈现 MediaSnifferView）。
+    @Published var showMediaSniffer = false
+
+    /// 打开媒体嗅探：先对当前页面嗅探音/视频地址，取回后再呈现结果页。
+    /// 非浏览态无网页可嗅探，提示后不进入。
+    func openMediaSniffer() {
+        guard isBrowsing, let engine else {
+            showToast("请先打开网页", symbol: "exclamationmark.circle")
+            return
+        }
+        engine.sniffMedia { [weak self] hits in
+            guard let self else { return }
+            self.mediaHits = hits
+            self.showMediaSniffer = true
+        }
+    }
+
+    /// 下载某条媒体命中（交给 DownloadManager 真实下载到 Downloads 目录）。
+    func downloadMediaHit(_ hit: MediaHit) {
+        guard let manager = downloadManager else {
+            showToast("下载服务未就绪", symbol: "exclamationmark.circle"); return
+        }
+        manager.start(urlString: hit.url)
+        showToast("开始下载…", symbol: "arrow.down.circle")
+    }
+
+    /// 分享某条媒体命中地址（系统分享面板）。
+    func shareMediaHit(_ hit: MediaHit) {
+        guard let url = URL(string: hit.url) else {
+            showToast("无效的媒体地址", symbol: "exclamationmark.circle"); return
+        }
+        shareItem = ShareItem(url: url)
+    }
+
+// MARK: - 稍后读 / 离线阅读列表
+/// 抓当前页正文（engine.fetchReadableArticle）整篇存入 ReadingListStore + toast。
+/// 非浏览态无网页可抓，提示后返回。空正文由 store.add 显式抛错、提示失败。
+func saveToReadingList() {
+    guard isBrowsing, let engine else {
+        showToast("请先打开网页", symbol: "exclamationmark.circle")
+        return
+    }
+    showToast("正在保存到稍后读…", symbol: "text.badge.plus")
+    let fullURL = engine.webView.url?.absoluteString ?? currentURL
+    engine.fetchReadableArticle { [weak self] article in
+        guard let self else { return }
+        let item = ReadingListItem(
+            title: article.title.isEmpty ? self.currentTitle : article.title,
+            host: article.host.isEmpty ? self.currentURL : article.host,
+            url: fullURL,
+            paragraphs: article.paragraphs
+        )
+        do {
+            try ReadingListStore.shared.add(item)
+            self.showToast("已加入稍后读", symbol: "text.book.closed.fill")
+        } catch {
+            self.showToast("未能提取到正文，保存失败", symbol: "exclamationmark.circle")
+        }
     }
 }
 

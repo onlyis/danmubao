@@ -49,6 +49,7 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIStatusBarStyle: UIStatusBarStyleDefault
+        NSLocalNetworkUsageDescription: 用于「Wi-Fi 文件传输」在同一局域网内的设备间收发文件
         UIBackgroundModes:
           - audio
         NSAppTransportSecurity:

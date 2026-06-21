@@ -118,6 +118,8 @@ enum MenuCatalog {
         .init(title: "夜间模式", symbol: "moon", isToggle: true),
         .init(title: "无图模式", symbol: "photo.on.rectangle.angled", isToggle: true),
         .init(title: "阅读模式", symbol: "doc.text"),
+        .init(title: "稍后读", symbol: "text.badge.plus"),
+        .init(title: "阅读列表", symbol: "text.book.closed"),
         .init(title: "看图模式", symbol: "photo.stack"),
         .init(title: "网页翻译", symbol: "character.bubble"),
         .init(title: "页面搜索", symbol: "doc.text.magnifyingglass"),
@@ -156,6 +158,7 @@ enum MenuCatalog {
 
     static let page3: [MenuAction] = [
         .init(title: "视频悬浮", symbol: "pip"),
+        .init(title: "媒体嗅探", symbol: "antenna.radiowaves.left.and.right"),
         .init(title: "后台播放", symbol: "play.circle"),
         .init(title: "画中画", symbol: "pip.enter"),
         .init(title: "AirPlay", symbol: "airplayvideo"),

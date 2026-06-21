@@ -69,6 +69,15 @@ struct RootView: View {
         }
         // 盾牌控制面板（网页快捷操作，可自定义）
         .sheet(isPresented: $vm.showControlPanel) { ControlPanelSheet() }
+        // 网页媒体嗅探结果
+        .sheet(isPresented: $vm.showMediaSniffer) {
+            MediaSnifferView()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(Theme.Radius.sheet)
+        }
+
+        .sheet(isPresented: $vm.showControlPanel) { ControlPanelSheet() }
         .sheet(isPresented: $vm.showQRGenerate) {
             QRGenerateSheet()
                 .presentationDetents([.medium, .large])
@@ -173,6 +182,7 @@ struct RootView: View {
         case .files:        FilesView()
         case .settings:     SettingsView()
         case .reading:      ReadingModeView()
+        case .readingList:  ReadingListView()
         case .imageViewer:  ImageGridView()
         case .comic:        ComicReaderView()
         case .toolbox:      ToolboxView()

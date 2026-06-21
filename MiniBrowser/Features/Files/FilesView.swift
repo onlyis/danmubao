@@ -16,6 +16,7 @@ struct FilesView: View {
     @State private var newFolderName = ""
     @State private var showDocImporter = false
     @State private var showPhotoImporter = false
+    @State private var showWiFiTransfer = false
 
     private let categoryColumns = [GridItem(.flexible()), GridItem(.flexible())]
     private let gridColumns = [GridItem(.adaptive(minimum: 96), spacing: Theme.Spacing.m)]
@@ -68,7 +69,7 @@ struct FilesView: View {
             }
 
             Section {
-                Button { } label: { Label("Wi-Fi 传输", systemImage: "wifi") }
+                Button { showWiFiTransfer = true } label: { Label("Wi-Fi 传输", systemImage: "wifi") }
                 Button { showPhotoImporter = true } label: { Label("从相册导入", systemImage: "photo") }
                 Button { showDocImporter = true } label: { Label("从系统文件导入", systemImage: "folder.badge.plus") }
             }
@@ -111,6 +112,9 @@ struct FilesView: View {
                 if count > 0 { reload(); vm.showToast("已导入 \(count) 个文件") }
             }
             .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showWiFiTransfer, onDismiss: reload) {
+            WiFiTransferView()
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { Button("完成") { dismiss() } }

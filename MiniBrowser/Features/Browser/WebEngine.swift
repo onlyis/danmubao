@@ -585,6 +585,71 @@ private func injectAdHideCSS() {
                                notBefore: nil, notAfter: nil, serialNumber: "", chainLength: chain.count)
     }
 
+    /// 嗅探页面内全部 <video>/<audio>（含其 <source> 子节点）的可下载地址。
+    /// 仅收集 http(s)，按地址去重；标题取最近标题/aria-label 或文件名兜底。回调在主线程。
+    func sniffMedia(_ completion: @escaping ([MediaHit]) -> Void) {
+        let js = """
+        (function(){
+          var out = [];
+          // 取一个可读标题：优先 title/aria-label，否则向上找最近标题文本，最后回退到文件名。
+          function readableTitle(el, src){
+            var t = (el.getAttribute('title') || el.getAttribute('aria-label') || '').trim();
+            if (t) return t;
+            var node = el, depth = 0;
+            while (node && depth < 5){
+              var h = node.querySelector ? node.querySelector('h1,h2,h3,figcaption') : null;
+              if (h && h.innerText && h.innerText.trim()) return h.innerText.trim().slice(0,80);
+              node = node.parentElement; depth++;
+            }
+            try {
+              var u = new URL(src, location.href);
+              var last = u.pathname.split('/').filter(Boolean).pop();
+              if (last) return decodeURIComponent(last);
+            } catch(e){}
+            return src;
+          }
+          function add(src, kind, el){
+            if (!src) return;
+            // 仅收集 http(s)（排除 blob:/data:/相对资源）。
+            if (src.indexOf('http') !== 0) return;
+            out.push({ url: src, kind: kind, title: readableTitle(el, src) });
+          }
+          ['video','audio'].forEach(function(tag){
+            var els = document.getElementsByTagName(tag);
+            for (var i=0;i<els.length;i++){
+              var el = els[i];
+              add(el.currentSrc || el.src || '', tag, el);
+              var sources = el.getElementsByTagName('source');
+              for (var j=0;j<sources.length;j++){
+                add(sources[j].src || sources[j].getAttribute('src') || '', tag, el);
+              }
+            }
+          });
+          // 按 url 去重，保留首次出现。
+          var seen = {}, dedup = [];
+          for (var k=0;k<out.length;k++){
+            var u = out[k].url;
+            if (seen[u]) continue;
+            seen[u] = 1;
+            dedup.push(out[k]);
+          }
+          return dedup.slice(0, 200);
+        })();
+        """
+        webView.evaluateJavaScript(js) { result, _ in
+            let raw = (result as? [[String: Any]]) ?? []
+            let hits: [MediaHit] = raw.compactMap { item in
+                guard let url = item["url"] as? String, !url.isEmpty else { return nil }
+                let kind: MediaHit.Kind = (item["kind"] as? String) == "audio" ? .audio : .video
+                let title = (item["title"] as? String).map { $0.isEmpty ? url : $0 } ?? url
+                return MediaHit(url: url, kind: kind, title: title)
+            }
+            // evaluateJavaScript 回调在主线程派发；本类方法为 @MainActor，直接回调。
+            completion(hits)
+        }
+    }
+
+
     // MARK: - 输入归一化：网址 or 搜索关键词
     static func normalize(_ text: String, searchTemplate: String) -> URL {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
