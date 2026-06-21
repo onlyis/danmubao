@@ -81,6 +81,8 @@ MiniBrowser/
   - 弹层（菜单/标签/网站设置/搜索/下载确认）各用一个 `Bool` 开关 + sheet/cover。
 - **多标签独立引擎**：`Tab` 是**引用类型**（`@MainActor ObservableObject`），每个 Tab 拥有自己的 `WebEngine`（封装 `WKWebView`）。
   - `vm.currentTab` / `vm.engine`（= currentTab.engine）。切换标签 = 改 `currentTabID`。`currentTab` 走 `tabIndex: [UUID: Tab]` 做 **O(1)** 查找（海量标签防卡顿）。
+  - **真实缩略图**：`Tab.thumbnail`（`WebEngine.snapshot` 降采样 300pt 宽），打开标签管理（`TabsView.onAppear`）或滑动切换时截当前标签；未访问标签仍用渐变占位。
+  - **滑动切换标签**：底部工具栏横向拖动 `vm.switchTab(by:±1)`（环绕，离开前截图），`simultaneousGesture` 不影响按钮点击。
   - **引擎 LRU 池**（`EnginePool`，maxLive 按设备内存自适应 3/5/8/10）：标签很多时只保留最近用的 N 个 WKWebView，后台引擎 `Tab.evictEngine()` 回收（存 `interactionState`），重新激活时 `Tab.engine` 惰性恢复。当前标签永不回收。
   - 视图通过 `@ObservedObject` 观察具体 `Tab` / `WebEngine`（因为嵌套 ObservableObject 不会自动透传）。`BottomToolbar` 的前进键用 `ForwardButton` 包一层 `@ObservedObject engine` 才能响应 `canGoForward`。
 - **WebEngine**：KVO 观察 `estimatedProgress/title/url/canGoBack/canGoForward`，`WKNavigationDelegate` 管理 loading；`setDesktop`(切 UA 重载) / `applyNight`(注入反色 CSS) 联动网站设置。
@@ -142,7 +144,7 @@ MiniBrowser/
 | 网页浏览（真实 WKWebView、地址栏、进度、刷新/停止） | ✅ 真实 | `Browser/BrowserView.swift`, `Browser/WebEngine.swift` |
 | 底部工具栏（后退/前进/菜单/标签/主页，真实前进后退历史） | ✅ | `Browser/BottomToolbar.swift` |
 | 底部主菜单（三屏宫格 60 项 + 快捷操作行 + 状态行） | ✅ | `Menu/MainMenuSheet.swift` |
-| 多标签管理（卡片缩略图、普通/无痕、独立引擎） | ✅ 真实 | `Tabs/TabsView.swift`, `Models/Tab.swift` |
+| 多标签管理（真实页面缩略图、普通/无痕、独立引擎、滑动切换） | ✅ 真实 | `Tabs/TabsView.swift`, `Models/Tab.swift` |
 | 书签 + 历史（持久化、真实记录、删除/清除/收藏） | ✅ 真实 | `Bookmarks/*`, `DiskStore` |
 | 下载（URLSession 真实下载/暂停/续传/删除/分享） | ✅ 真实 | `Files/DownloadManager.swift`, `Files/DownloadsView.swift` |
 | 文件管理（真实列目录/删除/重命名/移动/建文件夹/分享） | ✅ 真实 | `Files/FilesView.swift`, `FileStore` |

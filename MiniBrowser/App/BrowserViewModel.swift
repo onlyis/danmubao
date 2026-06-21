@@ -375,6 +375,21 @@ final class BrowserViewModel: ObservableObject {
         isBrowsing = false
     }
 
+    /// 截取当前标签缩略图（打开标签管理前调用）
+    func captureCurrentThumbnail() { currentTab?.captureThumbnail() }
+
+    /// 手势滑动切换到相邻标签（环绕），离开前先截图当前标签。
+    func switchTab(by offset: Int) {
+        let tabs = activeTabs
+        guard tabs.count > 1, let cur = currentTab,
+              let idx = tabs.firstIndex(where: { $0.id == cur.id }) else { return }
+        cur.captureThumbnail()
+        let next = tabs[(idx + offset + tabs.count) % tabs.count]
+        select(next)
+        if next.isHome { showToast("新标签页", symbol: "house") }
+        else { showToast(next.displayTitle, symbol: "square.on.square") }
+    }
+
     /// 选择某个标签
     func select(_ tab: Tab) {
         currentTabID = tab.id

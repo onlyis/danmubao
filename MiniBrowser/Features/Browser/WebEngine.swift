@@ -116,6 +116,13 @@ final class WebEngine: NSObject, ObservableObject {
         }
     }
 
+    /// 截取当前页缩略图（降采样到 300pt 宽，省内存），用于标签卡片。
+    func snapshot(_ completion: @escaping (UIImage?) -> Void) {
+        let config = WKSnapshotConfiguration()
+        config.snapshotWidth = 300
+        webView.takeSnapshot(with: config) { image, _ in completion(image) }
+    }
+
     /// 调起系统页面查找栏。
     func presentFind() {
         webView.findInteraction?.presentFindNavigator(showingReplace: false)

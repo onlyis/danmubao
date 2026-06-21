@@ -34,6 +34,7 @@ struct TabsView: View {
             bottomBar
         }
         .background((vm.isIncognito ? Color.black : Theme.Colors.background).ignoresSafeArea())
+        .onAppear { vm.captureCurrentThumbnail() }
     }
 
     private var topBar: some View {
@@ -110,7 +111,11 @@ private struct TabCard: View {
             // 缩略图
             ZStack(alignment: .topTrailing) {
                 Group {
-                    if tab.isHome {
+                    if let thumb = tab.thumbnail, !tab.isHome {
+                        Image(uiImage: thumb)
+                            .resizable().scaledToFill()
+                            .frame(maxWidth: .infinity)
+                    } else if tab.isHome {
                         Theme.Colors.groupedBackground.overlay {
                             Image(systemName: "house.fill").font(.system(size: 30)).foregroundStyle(Theme.Colors.tertiaryText)
                         }

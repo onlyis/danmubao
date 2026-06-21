@@ -30,6 +30,8 @@ final class Tab: ObservableObject, Identifiable {
     }
 
     @Published var isHome: Bool
+    /// 标签卡片的真实页面缩略图（离开/打开标签管理时截取）
+    @Published var thumbnail: UIImage?
     /// 加载前用于缩略图/卡片展示的占位信息
     @Published var placeholderTitle: String
     @Published var placeholderURL: String
@@ -80,6 +82,12 @@ final class Tab: ObservableObject, Identifiable {
         placeholderURL = text
         didLoad = true
         engine.submit(text, searchTemplate: searchTemplate)
+    }
+
+    /// 截取当前页缩略图（仅当前可见标签可靠，需引擎已创建）
+    func captureThumbnail() {
+        guard let e = _engine, !isHome else { return }
+        e.snapshot { [weak self] img in if let img { self?.thumbnail = img } }
     }
 
     /// 切回该标签时，若有占位地址但尚未加载，则补加载
