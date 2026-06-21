@@ -47,21 +47,17 @@ private struct SearchInputField: View {
                     .toolbar {
                         ToolbarItemGroup(placement: .keyboard) {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    // 点击引擎图标：带着输入内容用该引擎搜索（轻量图标，无边框，小圆角）
-                                    ForEach(vm.allSearchEngines) { e in
-                                        Button { tapEngine(e) } label: {
-                                            SiteIcon(glyph: e.glyph, color: e.color, size: 30, corner: 8)
-                                                .opacity(e.id == vm.searchEngine.id ? 1 : 0.45)
-                                        }
+                                HStack(spacing: 8) {
+                                    ForEach(["https://", "m.", ".com"], id: \.self) { frag in
+                                        Button { query += frag } label: { urlChip(frag) }
                                     }
-                                    Divider().frame(height: 20)
-                                    ForEach([".com", "/"], id: \.self) { frag in
-                                        Button(frag) { query += frag }
-                                            .font(.system(size: 15)).foregroundStyle(Theme.Colors.secondaryText)
+                                    // 引擎卡：点击带着内容用该引擎搜索
+                                    ForEach(vm.allSearchEngines) { e in
+                                        Button { tapEngine(e) } label: { engineChip(e) }
                                     }
                                 }
-                                .padding(.horizontal, 4)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
                             }
                         }
                     }
@@ -92,6 +88,31 @@ private struct SearchInputField: View {
         vm.searchEngine = e
         let q = query.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty { onSubmit(q) }
+    }
+
+    /// URL 片段小卡（白底圆角）
+    private func urlChip(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15))
+            .foregroundStyle(Theme.Colors.primaryText)
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(Theme.Colors.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.Colors.separator, lineWidth: 0.5))
+    }
+
+    /// 引擎方卡：未选=白底品牌色字；选中=品牌色底白字（参考图样式）
+    private func engineChip(_ e: SearchEngine) -> some View {
+        let selected = e.id == vm.searchEngine.id
+        return Text(e.glyph)
+            .font(.system(size: 16, weight: .bold, design: .rounded))
+            .foregroundStyle(selected ? .white : e.color)
+            .frame(width: 40, height: 40)
+            .background(selected ? AnyShapeStyle(e.color) : AnyShapeStyle(Theme.Colors.card),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.Colors.separator, lineWidth: selected ? 0 : 0.5))
     }
 }
 
