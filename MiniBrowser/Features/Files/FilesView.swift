@@ -17,12 +17,35 @@ struct FilesView: View {
     @State private var showDocImporter = false
     @State private var showPhotoImporter = false
     @State private var showWiFiTransfer = false
+    /// 当前选中的分类筛选（nil = 全部）。点分类宫格切换。
+    @State private var selectedKind: FileKind?
+    /// 当前浏览目录（支持进入子文件夹）。默认下载根目录。
+    @State private var currentDir: URL = DownloadManager.downloadsDirectory
+    private var atRoot: Bool { currentDir.standardizedFileURL == DownloadManager.downloadsDirectory.standardizedFileURL }
 
     private let categoryColumns = [GridItem(.flexible()), GridItem(.flexible())]
     private let gridColumns = [GridItem(.adaptive(minimum: 96), spacing: Theme.Spacing.m)]
 
     private var filtered: [FileItem] {
-        search.isEmpty ? files : files.filter { $0.name.localizedCaseInsensitiveContains(search) }
+        var list = files
+        if let kind = selectedKind { list = list.filter { matchesKind($0, kind) } }
+        if !search.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(search) } }
+        return list
+    }
+
+    /// 按扩展名把文件归入某分类（文件夹始终保留显示；「下载/最近使用」视为全部）。
+    private func matchesKind(_ file: FileItem, _ kind: FileKind) -> Bool {
+        if file.isFolder { return true }
+        let ext = (file.name as NSString).pathExtension.lowercased()
+        switch kind {
+        case .download, .recent: return true   // 全部
+        case .video:    return ["mp4","mov","mkv","avi","flv","wmv","m4v"].contains(ext)
+        case .image:    return ["jpg","jpeg","png","gif","webp","heic","bmp","svg"].contains(ext)
+        case .audio:    return ["mp3","wav","aac","flac","m4a","ogg","aiff"].contains(ext)
+        case .archive:  return ["zip","rar","7z","tar","gz"].contains(ext)
+        case .ebook:    return ["epub","mobi","azw3","pdf"].contains(ext)
+        case .document: return ["doc","docx","txt","html","htm","md","json","xml","rtf","csv"].contains(ext)
+        }
     }
 
     /// 把一个文件的操作打包，供列表行与网格格复用（DRY）。
@@ -33,9 +56,11 @@ struct FilesView: View {
             extract: { extract(file) },
             rename: { renameText = file.name; renameTarget = file },
             move: { moveTarget = file },
-            openPDF: { vm.openPDF(fileName: file.name) },
-            openText: { vm.openTextFile(named: file.name) },
-            compressImg: { if vm.compressImage(name: file.name) { reload() } })
+            openPDF: { vm.openPDF(fileName: file.name, in: currentDir) },
+            openText: { vm.openTextFile(named: file.name, in: currentDir) },
+            compressImg: { if vm.compressImage(name: file.name, in: currentDir) { reload() } },
+            open: { open(file) },
+            dir: currentDir)
     }
 
     var body: some View {
@@ -43,14 +68,28 @@ struct FilesView: View {
             Section {
                 LazyVGrid(columns: categoryColumns, spacing: Theme.Spacing.m) {
                     ForEach(FileKind.allCases, id: \.self) { kind in
-                        CategoryCard(kind: kind)
+                        Button {
+                            // 点同一分类再次取消；「下载」视为「全部」（清除筛选）。
+                            if kind == .download { selectedKind = nil }
+                            else { selectedKind = (selectedKind == kind) ? nil : kind }
+                        } label: {
+                            CategoryCard(kind: kind, active: kind == .download ? selectedKind == nil : selectedKind == kind)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.vertical, 4)
                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
             }
 
-            Section("下载目录 (\(files.count))") {
+            Section(atRoot ? "下载目录 (\(files.count))" : "\(currentDir.lastPathComponent) (\(files.count))") {
+                if !atRoot {
+                    Button {
+                        currentDir = currentDir.deletingLastPathComponent(); reload()
+                    } label: {
+                        Label("返回上级", systemImage: "arrow.up.left").foregroundStyle(Theme.Colors.accent)
+                    }
+                }
                 if filtered.isEmpty {
                     Text("暂无文件").font(.system(size: 14)).foregroundStyle(Theme.Colors.tertiaryText)
                 } else if isGrid {
@@ -94,7 +133,7 @@ struct FilesView: View {
             Button("创建") { createFolder() }
         }
         .sheet(item: $moveTarget) { file in
-            MoveSheet(fileName: file.name, folders: FileStore.folders()) { folder in
+            MoveSheet(fileName: file.name, folders: FileStore.folders(in: currentDir)) { folder in
                 performMove(file, to: folder)
             }
             .presentationDetents([.medium])
@@ -130,33 +169,41 @@ struct FilesView: View {
         }
     }
 
-    private func reload() { files = FileStore.list() }
+    private func reload() { files = FileStore.list(currentDir) }
+
+    /// 点击文件：文件夹→进入；PDF→阅读器；文本类→纯文本；其它→纯文本兜底。
+    private func open(_ file: FileItem) {
+        if file.isFolder { currentDir = currentDir.appendingPathComponent(file.name, isDirectory: true); selectedKind = nil; reload(); return }
+        let ext = (file.name as NSString).pathExtension.lowercased()
+        if ext == "pdf" { vm.openPDF(fileName: file.name, in: currentDir) }
+        else { vm.openTextFile(named: file.name, in: currentDir) }
+    }
 
     private func performRename() {
         guard let file = renameTarget else { return }
-        do { try FileStore.rename(file.name, to: renameText); reload() }
+        do { try FileStore.rename(file.name, to: renameText, in: currentDir); reload() }
         catch { errorMessage = "重命名失败：\(error.localizedDescription)" }
         renameTarget = nil
     }
 
     private func performMove(_ file: FileItem, to folder: String?) {
-        do { try FileStore.move(file.name, toFolder: folder); reload(); vm.showToast("已移动") }
+        do { try FileStore.move(file.name, toFolder: folder, in: currentDir); reload(); vm.showToast("已移动") }
         catch { errorMessage = "移动失败：\(error.localizedDescription)" }
     }
 
     private func createFolder() {
-        do { try FileStore.createFolder(newFolderName); reload() }
+        do { try FileStore.createFolder(newFolderName, in: currentDir); reload() }
         catch { errorMessage = "创建失败：\(error.localizedDescription)" }
         newFolderName = ""
     }
 
     private func delete(_ file: FileItem) {
-        FileStore.delete(name: file.name)
+        FileStore.delete(name: file.name, in: currentDir)
         reload()
     }
 
     private func compress(_ file: FileItem) {
-        let dir = DownloadManager.downloadsDirectory
+        let dir = currentDir
         let src = dir.appendingPathComponent(file.name)
         let base = file.isFolder ? file.name : (file.name as NSString).deletingPathExtension
         let dest = uniqueURL(dir.appendingPathComponent(base + ".zip"))
@@ -169,7 +216,7 @@ struct FilesView: View {
     }
 
     private func extract(_ file: FileItem) {
-        let dir = DownloadManager.downloadsDirectory
+        let dir = currentDir
         let src = dir.appendingPathComponent(file.name)
         let dest = uniqueURL(dir.appendingPathComponent((file.name as NSString).deletingPathExtension))
         do {
@@ -198,14 +245,18 @@ struct FilesView: View {
 
 private struct CategoryCard: View {
     let kind: FileKind
+    var active: Bool = false
     var body: some View {
         HStack(spacing: Theme.Spacing.s) {
-            Image(systemName: kind.symbol).font(.system(size: 18)).foregroundStyle(kind.color).frame(width: 26)
-            Text(kind.rawValue).font(.system(size: 14)).foregroundStyle(Theme.Colors.primaryText)
+            Image(systemName: kind.symbol).font(.system(size: 18))
+                .foregroundStyle(active ? .white : kind.color).frame(width: 26)
+            Text(kind.rawValue).font(.system(size: 14))
+                .foregroundStyle(active ? .white : Theme.Colors.primaryText)
             Spacer()
         }
         .padding(.horizontal, Theme.Spacing.m).frame(height: 46)
-        .background(Theme.Colors.groupedBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.small))
+        .background(active ? AnyShapeStyle(kind.color) : AnyShapeStyle(Theme.Colors.groupedBackground),
+                    in: RoundedRectangle(cornerRadius: Theme.Radius.small))
     }
 }
 
@@ -219,12 +270,16 @@ struct FileActions {
     var openPDF: () -> Void = {}
     var openText: () -> Void = {}
     var compressImg: () -> Void = {}
+    /// 点击文件行/格：文件夹进入、文件按类型打开。
+    var open: () -> Void = {}
+    /// 文件所在目录（供分享等需要绝对路径处使用）。
+    var dir: URL = DownloadManager.downloadsDirectory
 }
 
 /// 文件的菜单项（行 Menu 与格 contextMenu 共用，含分享）。
 @ViewBuilder
 private func fileMenuContent(_ file: FileItem, _ a: FileActions) -> some View {
-    let url = DownloadManager.downloadsDirectory.appendingPathComponent(file.name)
+    let url = a.dir.appendingPathComponent(file.name)
     let isZip = file.name.lowercased().hasSuffix(".zip")
     if !file.isFolder { ShareLink(item: url) { Label("分享", systemImage: "square.and.arrow.up") } }
     Button(action: a.rename) { Label("重命名", systemImage: "pencil") }
@@ -260,8 +315,11 @@ private struct FileRow: View {
                 fileMenuContent(file, actions)
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.Colors.tertiaryText)
+                    .padding(.leading, 8).contentShape(Rectangle())
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { actions.open() }
         .swipeActions {
             Button(role: .destructive, action: actions.delete) { Label("删除", systemImage: "trash") }
             if !file.isFolder {
@@ -292,6 +350,8 @@ private struct FileGridCell: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.m)
         .background(Theme.Colors.groupedBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+        .contentShape(Rectangle())
+        .onTapGesture { actions.open() }
         .contextMenu { fileMenuContent(file, actions) }
     }
 }

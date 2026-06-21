@@ -770,19 +770,19 @@ func resetSitePermissions() {
             }
         } else { route = .translate }
     }
-    /// 用 PDF 阅读器打开下载目录内 PDF。
-    func openPDF(fileName: String) {
-        let url = DownloadManager.downloadsDirectory.appendingPathComponent(fileName)
+    /// 用 PDF 阅读器打开指定目录内 PDF（默认下载目录，支持子文件夹）。
+    func openPDF(fileName: String, in dir: URL = DownloadManager.downloadsDirectory) {
+        let url = dir.appendingPathComponent(fileName)
         guard FileManager.default.fileExists(atPath: url.path) else { showToast("文件不存在", symbol: "exclamationmark.circle"); return }
         pdfPreviewURL = PDFPreviewItem(url: url)
     }
-    /// 以纯文本打开下载目录内文件。
-    func openTextFile(named name: String) { textFileURL = DownloadManager.downloadsDirectory.appendingPathComponent(name) }
-    /// 压缩下载目录里的图片。
+    /// 以纯文本打开指定目录内文件。
+    func openTextFile(named name: String, in dir: URL = DownloadManager.downloadsDirectory) { textFileURL = dir.appendingPathComponent(name) }
+    /// 压缩指定目录里的图片。
     @discardableResult
-    func compressImage(name: String) -> Bool {
+    func compressImage(name: String, in dir: URL = DownloadManager.downloadsDirectory) -> Bool {
         do {
-            let result = try ImageCompressor.compress(fileName: name)
+            let result = try ImageCompressor.compress(fileName: name, in: dir)
             let before = ByteCountFormatter.string(fromByteCount: result.originalBytes, countStyle: .file)
             let after = ByteCountFormatter.string(fromByteCount: result.compressedBytes, countStyle: .file)
             showToast("已压缩：\(before) → \(after)（省 \(Int((result.savedRatio*100).rounded()))%）", symbol: "photo.badge.arrow.down")
