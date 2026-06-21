@@ -142,9 +142,14 @@ final class BrowserViewModel: ObservableObject {
     @Published var gesture = GestureConfig() { didSet { DiskStore.save(gesture, to: "gestures.json") } }
 
     /// 底部工具栏按钮顺序（可自定义、持久化）。`.gesture` 仅在手势为「工具栏」放置时存在。
-    @Published var toolbarItems: [ToolbarItemKind] = [.night, .search, .menu, .tabs, .home] {
+    @Published var toolbarItems: [ToolbarItemKind] = [.incognito, .search, .menu, .tabs, .home] {
         didSet { DiskStore.save(toolbarItems, to: "toolbar.json") }
     }
+    /// 旧的内置默认布局（用于一次性迁移到新默认）
+    private static let legacyToolbars: [[ToolbarItemKind]] = [
+        [.back, .forward, .menu, .tabs, .home],
+        [.night, .search, .menu, .tabs, .home],
+    ]
 
     /// 切换手势放置方式：工具栏模式则把 `.gesture` 并入工具栏，悬浮模式则移出。
     func setGesturePlacement(_ p: GesturePlacement) {
@@ -249,7 +254,8 @@ final class BrowserViewModel: ObservableObject {
         if let g = DiskStore.load(GestureConfig.self, from: "gestures.json") { gesture = g }
         if let e = DiskStore.load(SearchEngine.self, from: "search_engine.json") { searchEngine = e }
         if let c = DiskStore.load([SearchEngine].self, from: "custom_engines.json") { customEngines = c }
-        if let t = DiskStore.load([ToolbarItemKind].self, from: "toolbar.json") { toolbarItems = t }
+        if let t = DiskStore.load([ToolbarItemKind].self, from: "toolbar.json"),
+           !Self.legacyToolbars.contains(t) { toolbarItems = t }   // 旧默认布局迁移到新默认
         if let sh = DiskStore.load([String].self, from: "search_history.json") { searchHistory = sh }
         if let ne = DiskStore.load([String].self, from: "nav_expanded.json") { navExpanded = Set(ne) }
         if let ql = DiskStore.load([QuickLink].self, from: "quicklinks.json") { quickLinks = ql }

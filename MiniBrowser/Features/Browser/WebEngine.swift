@@ -218,7 +218,10 @@ extension WebEngine: WKUIDelegate {
 
 /// 将 WKWebView 桥接进 SwiftUI
 struct WebViewContainer: UIViewRepresentable {
-    let engine: WebEngine
+    @ObservedObject var engine: WebEngine
     func makeUIView(context: Context) -> WKWebView { engine.webView }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        // 显式加载新地址期间隐藏 webView，避免看到旧页面（与 BrowserView 的遮罩双保险）
+        uiView.alpha = engine.navigating ? 0 : 1
+    }
 }

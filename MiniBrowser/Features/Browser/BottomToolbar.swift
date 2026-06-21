@@ -55,10 +55,10 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// 长按快捷操作（默认：夜间→历史，搜索→收藏，菜单→搜索，标签→新建，主页→关闭）
+    /// 长按快捷操作（默认：无痕→历史，搜索→收藏，菜单→搜索，标签→新建，主页→关闭）
     @MainActor func longPress(_ vm: BrowserViewModel) {
         switch self {
-        case .night: vm.route = .history
+        case .incognito, .night: vm.route = .history
         case .search: vm.route = .bookmarks
         case .menu: vm.showSearch = true
         case .tabs: vm.newTab()
@@ -101,7 +101,8 @@ struct BottomToolbar: View {
         case .home:    ToolbarButton(symbol: vm.isBrowsing ? "house" : "house.fill",
                                      action: { vm.goHome() }, longPress: { item.longPress(vm) })
         case .gesture: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)  // 占位，覆盖层绘制(醒目/普通两种样式)
-        default:       ToolbarButton(symbol: item.symbol, active: item == .night && vm.isNightMode,
+        default:       ToolbarButton(symbol: item.symbol,
+                                     active: (item == .incognito && vm.isIncognito) || (item == .night && vm.isNightMode),
                                      action: { item.perform(vm) }, longPress: { item.longPress(vm) })
         }
     }
@@ -136,9 +137,13 @@ private struct ToolbarButton: View {
     var active: Bool = false
     var action: () -> Void
     var longPress: (() -> Void)? = nil
+    @State private var longPressed = false
 
     var body: some View {
-        Button(action: { if enabled { Haptics.light(); action() } }) {
+        Button(action: {
+            if longPressed { longPressed = false; return }   // 抑制长按后的 tap
+            if enabled { Haptics.light(); action() }
+        }) {
             Image(systemName: symbol)
                 .font(.system(size: 21, weight: .regular))
                 .foregroundStyle(active ? Theme.Colors.accent : (enabled ? Theme.Colors.toolbarIcon : Theme.Colors.toolbarDisabled))
@@ -147,7 +152,8 @@ private struct ToolbarButton: View {
         }
         .buttonStyle(PressableStyle())
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-            if let longPress { Haptics.soft(); longPress() }
+            guard let longPress else { return }
+            longPressed = true; Haptics.soft(); longPress()
         })
     }
 }
@@ -159,9 +165,13 @@ private struct TabsButton: View {
     var action: () -> Void
     var longPress: (() -> Void)? = nil
     @State private var scale: CGFloat = 1
+    @State private var longPressed = false
 
     var body: some View {
-        Button(action: { Haptics.light(); action() }) {
+        Button(action: {
+            if longPressed { longPressed = false; return }
+            Haptics.light(); action()
+        }) {
             RoundedRectangle(cornerRadius: 5, style: .continuous)
                 .strokeBorder(Theme.Colors.toolbarIcon, lineWidth: 2)
                 .frame(width: 24, height: 24)
@@ -176,7 +186,8 @@ private struct TabsButton: View {
         }
         .buttonStyle(PressableStyle())
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-            if let longPress { Haptics.soft(); longPress() }
+            guard let longPress else { return }
+            longPressed = true; Haptics.soft(); longPress()
         })
         .onChange(of: pulse) { _, _ in
             scale = 1.35

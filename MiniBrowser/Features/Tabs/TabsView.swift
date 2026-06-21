@@ -17,6 +17,7 @@ struct TabsView: View {
             topBar
             Divider().overlay(Color.white.opacity(0.08))
 
+            ScrollViewReader { proxy in
             ScrollView {
                 if activeTabs.isEmpty {
                     emptyState
@@ -27,6 +28,7 @@ struct TabsView: View {
                                     isCurrent: tab.id == vm.currentTabID,
                                     open: { vm.select(tab) },
                                     close: { withAnimation(.easeOut(duration: 0.2)) { vm.close(tab) } })
+                                .id(tab.id)
                                 // 新建标签从左下角弹出
                                 .transition(.asymmetric(
                                     insertion: .scale(scale: 0.2, anchor: .bottomLeading).combined(with: .opacity),
@@ -41,6 +43,15 @@ struct TabsView: View {
                     }
                     .padding(Theme.Spacing.l)
                 }
+            }
+            .onAppear {
+                // 打开时滚动到当前标签
+                if let id = vm.currentTabID {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
+                    }
+                }
+            }
             }
 
             Divider().overlay(Color.white.opacity(0.08))
@@ -133,6 +144,7 @@ private struct TabCard: View {
     var isCurrent: Bool
     var open: () -> Void
     var close: () -> Void
+    @State private var dragX: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -178,6 +190,24 @@ private struct TabCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
                 .strokeBorder(Theme.Colors.accent, lineWidth: isCurrent ? 2 : 0)
+        )
+        // 左右滑动关闭（simultaneousGesture 不挡纵向滚动；仅横向位移时跟手）
+        .offset(x: dragX)
+        .opacity(1 - min(Double(abs(dragX)) / 240, 0.7))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20)
+                .onChanged { v in
+                    if abs(v.translation.width) > abs(v.translation.height) + 6 { dragX = v.translation.width }
+                }
+                .onEnded { v in
+                    if abs(dragX) > 90 {
+                        Haptics.soft()
+                        withAnimation(.easeOut(duration: 0.18)) { dragX = dragX > 0 ? 500 : -500 }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { close() }
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { dragX = 0 }
+                    }
+                }
         )
         .onTapGesture { Haptics.light(); open() }
         .contextMenu {
