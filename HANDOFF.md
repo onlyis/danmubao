@@ -112,7 +112,8 @@ MiniBrowser/
 
 层次：**触发**（按住右下角悬浮按钮）→ **手势**（笔画 = 8 向 `GestureDirection` 的有序序列，连续同向合并；另支持**圆形** `circleClockwise/circleCounterClockwise`，由转角和识别）→ **功能**（`GestureAction`）。规则 `GestureRule` = 手势→功能。`GestureConfig` 含放置方式/直线容差/按钮大小/圆形开关/触觉等可配置项（`GestureSettingsView` 的「放置方式」「手势控制」区）。设置页里手势按钮置顶为「特色功能」单独分组。
   - **放置方式** `GesturePlacement`：`floating`（悬浮可拖，拖到左右边缘**贴边停靠**只露一部分、半透明）/ `toolbar`（作为底部工具栏的一个图标）。
-  - **工具栏自定义**：`vm.toolbarItems: [ToolbarItemKind]`（持久化 `toolbar.json`），`BottomToolbar` 按它动态渲染；`ToolbarCustomizeView`（设置→自定义设置→自定义底部工具栏按钮）常驻拖动排序。`.gesture` 仅在放置方式=工具栏时存在（`vm.setGesturePlacement` 同步增删），其槽位由 `BottomToolbar` 留空、`GestureButton` 覆盖层在该等分位置绘制**强调色+细环**的特色图标并承接画手势，与其它灰色图标区分。`setGesturePlacement` 在 GestureSettingsView 的放置方式 Picker 调用。
+  - **工具栏自定义（任意功能 1…8 个）**：`ToolbarItemKind` 是约 20 种功能的池（导航/功能/开关，各带 `perform(vm)`）；`vm.toolbarItems`（持久化 `toolbar.json`）任意增删排序，`addToolbarItem/removeToolbarItem/moveToolbarItems` 强制 1…8 约束。`ToolbarCustomizeView`（设置→自定义设置→自定义底部工具栏按钮）= 当前栏(EditButton 排序/左滑删) + 可添加池(点 + 加)。`BottomToolbar` 按 `toolbarItems` 动态渲染：back/forward/tabs/home/gesture 特殊渲染，其余通用 `ToolbarButton{ kind.perform(vm) }`。
+  - **手势作为工具栏项**：`.gesture ∈ toolbarItems ⟺ gesture.placement == .toolbar`（`setGesturePlacement`/增删方法同步，VM.init 启动校正防旧数据空槽）。槽位由 `BottomToolbar` 留空、`GestureButton` 覆盖层在该等分位置绘制图标并承接画手势。**图标样式可配** `gesture.distinctIcon`（默认 true=强调色+细环醒目；false=与普通灰图标一致防分心）。工具栏槽位 y 用**主窗口真实 `safeAreaInsets.bottom`**（`GestureButton.safeBottomInset`）精确对齐各机型。
   - **直线容差** `straightness`（取代原灵敏度）：识别器按转角和容差 `toleranceDeg=25+straightness*50`，把画得弯一点的线吸收为一段直线，不易被拆成多段。
 
 - `GestureModels.swift`：方向/功能/规则/`GestureConfig`(启用+归一化位置+规则数组) + `GestureRecognizer.recognize(points)`（按段长阈值把路径切成方向 token）。

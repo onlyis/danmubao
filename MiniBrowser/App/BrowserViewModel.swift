@@ -125,10 +125,25 @@ final class BrowserViewModel: ObservableObject {
     func setGesturePlacement(_ p: GesturePlacement) {
         gesture.placement = p
         if p == .toolbar {
-            if !toolbarItems.contains(.gesture) { toolbarItems.append(.gesture) }
+            if !toolbarItems.contains(.gesture), toolbarItems.count < 8 { toolbarItems.append(.gesture) }
         } else {
             toolbarItems.removeAll { $0 == .gesture }
         }
+    }
+
+    // MARK: - 工具栏自定义（1…8 个，任意功能）
+    func addToolbarItem(_ k: ToolbarItemKind) {
+        guard toolbarItems.count < 8, !toolbarItems.contains(k) else { return }
+        toolbarItems.append(k)
+        if k == .gesture { gesture.placement = .toolbar }
+    }
+    func removeToolbarItem(_ k: ToolbarItemKind) {
+        guard toolbarItems.count > 1 else { return }
+        toolbarItems.removeAll { $0 == k }
+        if k == .gesture { gesture.placement = .floating }
+    }
+    func moveToolbarItems(from: IndexSet, to: Int) {
+        toolbarItems.move(fromOffsets: from, toOffset: to)
     }
 
     /// 看图模式：当前页面提取出的图片地址
@@ -139,6 +154,11 @@ final class BrowserViewModel: ObservableObject {
         if let e = DiskStore.load(SearchEngine.self, from: "search_engine.json") { searchEngine = e }
         if let c = DiskStore.load([SearchEngine].self, from: "custom_engines.json") { customEngines = c }
         if let t = DiskStore.load([ToolbarItemKind].self, from: "toolbar.json") { toolbarItems = t }
+        // 不变式校正：gesture ∈ toolbarItems ⟺ 放置方式为工具栏（防旧数据不一致导致空槽）
+        let gestureInToolbar = toolbarItems.contains(.gesture)
+        if (gesture.placement == .toolbar) != gestureInToolbar {
+            gesture.placement = gestureInToolbar ? .toolbar : .floating
+        }
         // 恢复上次的标签（无痕标签不持久化）。属性观察器在 init 中不触发，恢复不会回写。
         if let state = DiskStore.load(TabsState.self, from: "tabs.json"), !state.tabs.isEmpty {
             tabs = state.tabs.map(Tab.init)

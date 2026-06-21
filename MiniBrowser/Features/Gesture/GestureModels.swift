@@ -123,6 +123,8 @@ struct GestureConfig: Codable {
     var enableCircle: Bool = true
     /// 命中时是否触觉反馈。
     var haptics: Bool = true
+    /// 工具栏模式下手势图标是否醒目显示（强调色+细环）；false 则与普通图标一致，防止分心。
+    var distinctIcon: Bool = true
 
     /// 直线容差角（度）：相邻段方向偏离当前直线段在此角度内不算转向。
     var straightnessToleranceDeg: Double { 25 + straightness * 50 }   // 25°…75°
@@ -140,6 +142,7 @@ struct GestureConfig: Codable {
         buttonSize   = try c.decodeIfPresent(Double.self, forKey: .buttonSize) ?? 1.0
         enableCircle = try c.decodeIfPresent(Bool.self, forKey: .enableCircle) ?? true
         haptics      = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
+        distinctIcon = try c.decodeIfPresent(Bool.self, forKey: .distinctIcon) ?? true
     }
 }
 

@@ -73,38 +73,66 @@ struct CustomSettingsView: View {
     }
 }
 
-// MARK: - 自定义底部工具栏按钮
+// MARK: - 自定义底部工具栏按钮（任意功能、1…8 个）
 struct ToolbarCustomizeView: View {
     @EnvironmentObject var vm: BrowserViewModel
+    private var available: [ToolbarItemKind] { ToolbarItemKind.allCases.filter { !vm.toolbarItems.contains($0) } }
+
     var body: some View {
         List {
             Section {
                 ForEach(vm.toolbarItems) { item in
-                    HStack(spacing: Theme.Spacing.m) {
-                        Image(systemName: item.symbol)
-                            .font(.system(size: 17))
-                            .foregroundStyle(item.isGesture ? Theme.Colors.accent : Theme.Colors.primaryText)
-                            .frame(width: 28)
-                        Text(item.title)
-                            .foregroundStyle(item.isGesture ? Theme.Colors.accent : Theme.Colors.primaryText)
-                        if item.isGesture {
-                            Text("特色").font(.system(size: 11, weight: .semibold))
-                                .padding(.horizontal, 7).padding(.vertical, 2)
-                                .background(Theme.Colors.accent.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Theme.Colors.accent)
+                    row(item)
+                        .deleteDisabled(vm.toolbarItems.count <= 1)
+                }
+                .onMove { vm.moveToolbarItems(from: $0, to: $1) }
+                .onDelete { idx in idx.map { vm.toolbarItems[$0] }.forEach(vm.removeToolbarItem) }
+            } header: {
+                Text("当前工具栏（\(vm.toolbarItems.count)/8）· 编辑可排序，左滑删除")
+            } footer: {
+                Text("最少 1 个、最多 8 个。「手势按钮」是特色项，样式可在「手势按钮 → 工具栏图标醒目显示」里切换。")
+            }
+
+            if !available.isEmpty {
+                Section("可添加功能") {
+                    ForEach(available) { item in
+                        Button { vm.addToolbarItem(item) } label: {
+                            HStack(spacing: Theme.Spacing.m) {
+                                iconLabel(item)
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(vm.toolbarItems.count >= 8 ? Theme.Colors.tertiaryText : Theme.Colors.accent)
+                            }
                         }
-                        Spacer()
+                        .disabled(vm.toolbarItems.count >= 8)
                     }
                 }
-                .onMove { vm.toolbarItems.move(fromOffsets: $0, toOffset: $1) }
-            } header: {
-                Text("拖动右侧把手调整底部工具栏图标顺序")
-            } footer: {
-                Text("「手势按钮」是特色项：在「设置 → 手势按钮 → 放置方式」选「工具栏图标」后会出现在这里，可与其它图标一起排序。")
             }
         }
-        .environment(\.editMode, .constant(.active))
         .navigationTitle("工具栏按钮").navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { EditButton() } }
+    }
+
+    private func row(_ item: ToolbarItemKind) -> some View {
+        HStack(spacing: Theme.Spacing.m) {
+            iconLabel(item)
+            if item.isGesture {
+                Text("特色").font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Theme.Colors.accent.opacity(0.15), in: Capsule())
+                    .foregroundStyle(Theme.Colors.accent)
+            }
+            Spacer()
+        }
+    }
+    private func iconLabel(_ item: ToolbarItemKind) -> some View {
+        HStack(spacing: Theme.Spacing.m) {
+            Image(systemName: item.symbol)
+                .font(.system(size: 17))
+                .foregroundStyle(item.isGesture ? Theme.Colors.accent : Theme.Colors.primaryText)
+                .frame(width: 26)
+            Text(item.title).foregroundStyle(item.isGesture ? Theme.Colors.accent : Theme.Colors.primaryText)
+        }
     }
 }
 

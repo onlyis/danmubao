@@ -28,10 +28,15 @@ struct GestureSettingsView: View {
                     .pickerStyle(.segmented)
                 } header: {
                     Text("放置方式")
+                    if vm.gesture.placement == .toolbar {
+                        Toggle(isOn: $vm.gesture.distinctIcon) {
+                            Label("工具栏图标醒目显示", systemImage: "sparkles")
+                        }
+                    }
                 } footer: {
                     Text(vm.gesture.placement == .floating
                          ? "悬浮按钮可拖动；拖到屏幕左右边缘会贴边停靠，只露出一部分。"
-                         : "作为底部工具栏的一个图标，可在「自定义设置 → 自定义底部工具栏按钮」里调整位置。")
+                         : "作为底部工具栏的一个图标，可在「自定义设置 → 自定义底部工具栏按钮」里调整位置。关闭「醒目显示」后与普通图标一致，防止分心。")
                 }
 
                 Section("手势控制") {

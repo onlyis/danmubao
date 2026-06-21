@@ -1,23 +1,56 @@
 import SwiftUI
 
-/// 工具栏按钮种类（可在「自定义底部工具栏按钮」里排序；gesture 为特色项，需区分对待）。
+/// 工具栏按钮种类：可在「自定义底部工具栏按钮」里任意增删排序（1…8 个）。
+/// gesture 为特色项（画手势），可配置醒目或普通样式。
 enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
-    case back, forward, menu, tabs, home, gesture
+    case back, forward, reload, home, menu, tabs, newTab, search
+    case bookmarks, history, downloads, files, settings
+    case translate, reading, imageMode, qrScan, night, incognito, gesture
+
     var id: String { rawValue }
+    var isGesture: Bool { self == .gesture }
+
     var title: String {
         switch self {
-        case .back: return "后退"; case .forward: return "前进"; case .menu: return "菜单"
-        case .tabs: return "标签页"; case .home: return "主页"; case .gesture: return "手势按钮"
+        case .back: return "后退"; case .forward: return "前进"; case .reload: return "刷新"
+        case .home: return "主页"; case .menu: return "菜单"; case .tabs: return "标签页"
+        case .newTab: return "新标签"; case .search: return "搜索"; case .bookmarks: return "书签"
+        case .history: return "历史"; case .downloads: return "下载"; case .files: return "文件"
+        case .settings: return "设置"; case .translate: return "翻译"; case .reading: return "阅读模式"
+        case .imageMode: return "看图模式"; case .qrScan: return "扫码"; case .night: return "夜间模式"
+        case .incognito: return "无痕模式"; case .gesture: return "手势按钮"
         }
     }
     var symbol: String {
         switch self {
         case .back: return "chevron.left"; case .forward: return "chevron.right"
+        case .reload: return "arrow.clockwise"; case .home: return "house"
         case .menu: return "line.3.horizontal"; case .tabs: return "square.on.square"
-        case .home: return "house"; case .gesture: return "hand.draw.fill"
+        case .newTab: return "plus.square"; case .search: return "magnifyingglass"
+        case .bookmarks: return "bookmark"; case .history: return "clock.arrow.circlepath"
+        case .downloads: return "arrow.down.circle"; case .files: return "folder"
+        case .settings: return "gearshape"; case .translate: return "character.bubble"
+        case .reading: return "doc.text"; case .imageMode: return "photo.stack"
+        case .qrScan: return "qrcode.viewfinder"; case .night: return "moon"
+        case .incognito: return "eyeglasses"; case .gesture: return "hand.draw.fill"
         }
     }
-    var isGesture: Bool { self == .gesture }
+
+    @MainActor func perform(_ vm: BrowserViewModel) {
+        switch self {
+        case .back: vm.back(); case .forward: vm.forward(); case .reload: vm.engine?.reload()
+        case .home: vm.goHome(); case .menu: vm.showMenu = true; case .tabs: vm.showTabs = true
+        case .newTab: vm.newTab(); case .search: vm.showSearch = true
+        case .bookmarks: vm.route = .bookmarks; case .history: vm.route = .history
+        case .downloads: vm.route = .downloads; case .files: vm.route = .files
+        case .settings: vm.route = .settings; case .translate: vm.route = .translate
+        case .reading: vm.route = .reading; case .imageMode: vm.openImageMode()
+        case .qrScan: vm.route = .qrScanner
+        case .night: withAnimation { vm.isNightMode.toggle() }
+        case .incognito: vm.toggleIncognito()
+        case .gesture: break   // 由 GestureButton 覆盖层承接
+        }
+    }
 }
 
 /// 底部固定工具栏：按 `vm.toolbarItems` 顺序渲染，始终可见。
@@ -46,10 +79,10 @@ struct BottomToolbar: View {
         switch item {
         case .back:    ToolbarButton(symbol: "chevron.left", enabled: vm.isBrowsing) { vm.back() }
         case .forward: ForwardButton(engine: engine) { vm.forward() }
-        case .menu:    ToolbarButton(symbol: "line.3.horizontal") { vm.showMenu = true }
         case .tabs:    TabsButton(count: vm.tabCount) { vm.showTabs = true }
         case .home:    ToolbarButton(symbol: vm.isBrowsing ? "house" : "house.fill") { vm.goHome() }
-        case .gesture: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)  // 占位，覆盖层绘制
+        case .gesture: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)  // 占位，覆盖层绘制(醒目/普通两种样式)
+        default:       ToolbarButton(symbol: item.symbol) { item.perform(vm) }
         }
     }
 }

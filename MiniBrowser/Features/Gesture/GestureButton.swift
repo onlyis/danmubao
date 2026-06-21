@@ -43,15 +43,24 @@ struct GestureButton: View {
     @ViewBuilder
     private var button: some View {
         if inToolbar {
-            // 工具栏图标：用强调色 + 细环 + 底色，和其它灰色图标区分开
-            Image(systemName: "hand.draw.fill")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(Theme.Colors.accent)
-                .frame(width: radius * 2, height: radius * 2)
-                .background(Circle().fill(Theme.Colors.accent.opacity(0.12)))
-                .overlay(Circle().strokeBorder(Theme.Colors.accent.opacity(0.45), lineWidth: 1.5))
-                .scaleEffect(phase == .gesturing ? 1.15 : 1)
-                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phase)
+            // 工具栏图标：醒目=强调色+细环区分；普通=与其它图标一致（灰、防分心）
+            Group {
+                if vm.gesture.distinctIcon {
+                    Image(systemName: "hand.draw.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Theme.Colors.accent)
+                        .frame(width: radius * 2, height: radius * 2)
+                        .background(Circle().fill(Theme.Colors.accent.opacity(0.12)))
+                        .overlay(Circle().strokeBorder(Theme.Colors.accent.opacity(0.45), lineWidth: 1.5))
+                } else {
+                    Image(systemName: "hand.draw.fill")
+                        .font(.system(size: 21))
+                        .foregroundStyle(Theme.Colors.toolbarIcon)
+                        .frame(width: radius * 2, height: radius * 2)
+                }
+            }
+            .scaleEffect(phase == .gesturing ? 1.15 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phase)
         } else {
             ZStack {
                 Circle()
@@ -120,7 +129,7 @@ struct GestureButton: View {
         if inToolbar, let idx = vm.toolbarItems.firstIndex(of: .gesture) {
             let count = max(vm.toolbarItems.count, 1)
             let x = (CGFloat(idx) + 0.5) / CGFloat(count) * size.width
-            let y = size.height - (34 + Theme.Size.toolbarHeight / 2)   // 安全区底 + 半个工具栏
+            let y = size.height - Self.safeBottomInset - Theme.Size.toolbarHeight / 2
             return CGPoint(x: x, y: y)
         }
         if phase == .moving, let livePos { return clamp(livePos, in: size) }
@@ -132,6 +141,15 @@ struct GestureButton: View {
         let my = radius + 6
         return CGPoint(x: min(max(p.x, mx), size.width - mx),
                        y: min(max(p.y, my), size.height - my))
+    }
+
+    /// 真实底部安全区高度（home indicator）：覆盖层 ignoresSafeArea 后 GeometryReader 读不到，
+    /// 这里取主窗口 safeAreaInsets，保证工具栏槽位 y 在各机型精确对齐。
+    @MainActor private static var safeBottomInset: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?.safeAreaInsets.bottom ?? 34
     }
 
     // MARK: - 手势
