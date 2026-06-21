@@ -100,6 +100,7 @@ MiniBrowser/
   - **活跃引擎 LRU 上限池**（`Models/EnginePool.swift`，默认 maxLive=10）：绝不为每个标签常驻 WKWebView，后台引擎被回收释放内存；当前标签永不回收。`open`/`select`/`toggleIncognito` 时 `enginePool.touch`，`close` 时 `remove`。
   - **前进/后退/切回标签不重载**：活跃标签 `goBack/goForward` 走 WebKit bfcache 本就不重载；引擎被回收时用 `WKWebView.interactionState` 存完整会话（前进后退列表+滚动），`Tab.evictEngine`/重建（`Tab.engine` 惰性恢复 `savedSession`）实现无损还原。
   - 实测：1 万标签启动建表 5.5ms、标签网格（LazyVGrid 惰性）流畅渲染、无崩溃。
+  - **标签持久化**：普通标签（无痕不存）以轻量快照 `TabSnapshot`（id/isHome/title/url/tintHex，每条约百字节）存 `tabs.json`，重启恢复且**不建引擎**（选中再惰性加载）。写入合并防抖（`scheduleTabPersist`，0.5s 合并）+ 进入后台立即落盘（`scenePhase`→`persistTabsNow`）。不存 `interactionState`（海量标签下体积考虑）。实测写入/恢复闭环通过（来源 sample→disk）。
 - 删除死状态 `loadProgress`、示例下载/文件数据等。
 
 - **ToastStore 拆分**：toast 从 `BrowserViewModel` 移到独立 `Models/ToastStore.swift`（`@EnvironmentObject var toasts`，App 里 `.environmentObject(vm.toasts)`）。原因：toast 几乎每个动作都触发，挂在 god VM 上时一次提示会让所有观察 vm 的视图重新求值；独立后只刷新 ToastView。`vm.showToast(...)` 保留为薄转发（`toasts.show`），既有调用点不变。
@@ -215,6 +216,8 @@ MiniBrowser/
 - 书签：`Documents/bookmarks.json`
 - 历史：`Documents/history.json`
 - 下载文件：`Documents/Downloads/`（`DownloadManager.downloadsDirectory`）
+- 标签：`Documents/tabs.json`（`TabsState`，普通标签快照 + 当前 id；无痕不存）
+- 用户脚本：`Documents/userscripts.json`；插件状态：`Documents/plugins.json`
 - 首次启动无文件时回落到 `SampleData`（在 `BrowserViewModel.swift` 底部）。
 
 ---

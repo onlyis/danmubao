@@ -3,7 +3,7 @@ import SwiftUI
 /// 标签页（引用类型）：每个标签拥有独立的 WebEngine，保留各自的页面与前进/后退历史。
 @MainActor
 final class Tab: ObservableObject, Identifiable {
-    let id = UUID()
+    let id: UUID
     let isIncognito: Bool
 
     /// 引擎惰性创建：启动/标签网格里不会为未访问的标签建出 WKWebView。
@@ -33,20 +33,35 @@ final class Tab: ObservableObject, Identifiable {
     /// 加载前用于缩略图/卡片展示的占位信息
     @Published var placeholderTitle: String
     @Published var placeholderURL: String
-    let tint: Color
+    /// 卡片配色（以 hex 存储，便于持久化；Color 不可 Codable）
+    let tintHex: UInt
+    var tint: Color { Color(hex: tintHex) }
     /// 引擎是否已发起过加载
     private(set) var didLoad = false
 
-    init(isHome: Bool = true,
+    init(id: UUID = UUID(),
+         isHome: Bool = true,
          isIncognito: Bool = false,
          placeholderTitle: String = "新标签页",
          placeholderURL: String = "",
-         tint: Color = Theme.Colors.accent) {
+         tintHex: UInt = 0x0A84FF) {
+        self.id = id
         self.isHome = isHome
         self.isIncognito = isIncognito
         self.placeholderTitle = placeholderTitle
         self.placeholderURL = placeholderURL
-        self.tint = tint
+        self.tintHex = tintHex
+    }
+
+    /// 用于持久化的轻量快照（不含会话/引擎，海量标签下体积可控）。
+    var snapshot: TabSnapshot {
+        TabSnapshot(id: id, isHome: isHome, title: displayTitle, url: displayURL, tintHex: tintHex)
+    }
+
+    /// 从快照恢复（非无痕标签）。didLoad 为 false，选中时再惰性加载，启动不建引擎。
+    convenience init(_ s: TabSnapshot) {
+        self.init(id: s.id, isHome: s.isHome, isIncognito: false,
+                  placeholderTitle: s.title, placeholderURL: s.url, tintHex: s.tintHex)
     }
 
     var displayTitle: String {
@@ -73,4 +88,20 @@ final class Tab: ObservableObject, Identifiable {
         didLoad = true
         engine.submit(placeholderURL, searchTemplate: searchTemplate)
     }
+}
+
+/// 标签持久化快照：仅存元信息（地址/标题/配色），不含会话状态——
+/// 海量标签时体积可控（每条约百字节）。恢复后选中再惰性加载。
+struct TabSnapshot: Codable {
+    var id: UUID
+    var isHome: Bool
+    var title: String
+    var url: String
+    var tintHex: UInt
+}
+
+/// 持久化的标签集合（普通标签 + 当前选中 id；无痕标签不持久化）。
+struct TabsState: Codable {
+    var tabs: [TabSnapshot]
+    var currentID: UUID?
 }

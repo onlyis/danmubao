@@ -88,8 +88,29 @@ final class BrowserViewModel: ObservableObject {
 
     init() {
         if let g = DiskStore.load(GestureConfig.self, from: "gestures.json") { gesture = g }
+        // 恢复上次的标签（无痕标签不持久化）。属性观察器在 init 中不触发，恢复不会回写。
+        if let state = DiskStore.load(TabsState.self, from: "tabs.json"), !state.tabs.isEmpty {
+            tabs = state.tabs.map(Tab.init)
+            currentTabID = state.currentID ?? tabs.first?.id
+        } else {
+            currentTabID = tabs.first?.id
+        }
         for t in tabs { tabIndex[t.id] = t }
-        currentTabID = tabs.first?.id
+    }
+
+    // MARK: - 标签持久化（合并写，避免连续增删反复整表编码）
+    private var tabPersistWork: DispatchWorkItem?
+    /// 普通标签结构/地址变化后调用：延迟合并为一次落盘。
+    func scheduleTabPersist() {
+        guard !isIncognito else { return }   // 无痕态变化不持久化
+        tabPersistWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.persistTabsNow() }
+        tabPersistWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+    /// 立即落盘（供 App 进入后台时调用，捕获最新标题/地址）。
+    func persistTabsNow() {
+        DiskStore.save(TabsState(tabs: tabs.map(\.snapshot), currentID: currentTabID), to: "tabs.json")
     }
 
     // MARK: - 手势
@@ -175,6 +196,7 @@ final class BrowserViewModel: ObservableObject {
         }
         isBrowsing = true
         if !isIncognito { library.recordHistory(title: title ?? url, url: url) }
+        scheduleTabPersist()
     }
 
     func goHome() {
@@ -193,6 +215,7 @@ final class BrowserViewModel: ObservableObject {
             isBrowsing = true
         }
         showTabs = false
+        scheduleTabPersist()
     }
 
     /// 后退：优先网页历史，无历史则退回主页
@@ -212,6 +235,7 @@ final class BrowserViewModel: ObservableObject {
         currentTabID = tab.id
         goHome()
         showTabs = false
+        scheduleTabPersist()
     }
 
     func close(_ tab: Tab) {
@@ -226,6 +250,7 @@ final class BrowserViewModel: ObservableObject {
             currentTabID = activeTabs.first?.id
             isBrowsing = false
         }
+        scheduleTabPersist()
     }
 
     func closeAllActive() {
@@ -236,6 +261,7 @@ final class BrowserViewModel: ObservableObject {
         }
         currentTabID = nil
         isBrowsing = false
+        scheduleTabPersist()
     }
 
     func toggleIncognito() {
@@ -272,9 +298,9 @@ enum SampleData {
         [
             Tab(isHome: true),
             Tab(isHome: false, placeholderTitle: "天行九歌 第1集 超清HD - YouTube",
-                placeholderURL: "youtube.com", tint: Color(hex: 0x4A90D9)),
+                placeholderURL: "youtube.com", tintHex: 0x4A90D9),
             Tab(isHome: false, placeholderTitle: "百度一下，你就知道",
-                placeholderURL: "baidu.com", tint: Color(hex: 0x2932E1)),
+                placeholderURL: "baidu.com", tintHex: 0x2932E1),
         ]
     }
 
