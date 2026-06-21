@@ -8,13 +8,26 @@ final class Tab: ObservableObject, Identifiable {
 
     /// 引擎惰性创建：启动/标签网格里不会为未访问的标签建出 WKWebView。
     private var _engine: WebEngine?
+    /// 引擎被 LRU 池回收后保存的会话状态，下次访问 engine 时无损恢复（含前进/后退列表）。
+    private var savedSession: Data?
     var engine: WebEngine {
         if let e = _engine { return e }
         let e = WebEngine()
+        if let s = savedSession { e.sessionState = s; savedSession = nil }
         _engine = e
         return e
     }
     var hasEngine: Bool { _engine != nil }
+
+    /// 回收后台引擎以释放 WKWebView（海量标签时由 EnginePool 调用）。
+    /// 先把会话状态与最新标题/地址存下来，再丢弃引擎；卡片仍能正确展示，重新激活时无损恢复。
+    func evictEngine() {
+        guard let e = _engine else { return }
+        if !e.title.isEmpty { placeholderTitle = e.title }
+        if !e.displayURL.isEmpty { placeholderURL = e.displayURL }
+        savedSession = e.sessionState
+        _engine = nil
+    }
 
     @Published var isHome: Bool
     /// 加载前用于缩略图/卡片展示的占位信息

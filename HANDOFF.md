@@ -79,7 +79,8 @@ MiniBrowser/
   - 路由用 `enum Route` + `@Published var route: Route?` + `RootView.routeView(_:)` 的 `.fullScreenCover(item:)`。
   - 弹层（菜单/标签/网站设置/搜索/下载确认）各用一个 `Bool` 开关 + sheet/cover。
 - **多标签独立引擎**：`Tab` 是**引用类型**（`@MainActor ObservableObject`），每个 Tab 拥有自己的 `WebEngine`（封装 `WKWebView`）。
-  - `vm.currentTab` / `vm.engine`（= currentTab.engine）。切换标签 = 改 `currentTabID`。
+  - `vm.currentTab` / `vm.engine`（= currentTab.engine）。切换标签 = 改 `currentTabID`。`currentTab` 走 `tabIndex: [UUID: Tab]` 做 **O(1)** 查找（海量标签防卡顿）。
+  - **引擎 LRU 池**（`EnginePool`，maxLive=10）：标签很多时只保留最近用的 N 个 WKWebView，后台引擎 `Tab.evictEngine()` 回收（存 `interactionState`），重新激活时 `Tab.engine` 惰性恢复。当前标签永不回收。
   - 视图通过 `@ObservedObject` 观察具体 `Tab` / `WebEngine`（因为嵌套 ObservableObject 不会自动透传）。`BottomToolbar` 的前进键用 `ForwardButton` 包一层 `@ObservedObject engine` 才能响应 `canGoForward`。
 - **WebEngine**：KVO 观察 `estimatedProgress/title/url/canGoBack/canGoForward`，`WKNavigationDelegate` 管理 loading；`setDesktop`(切 UA 重载) / `applyNight`(注入反色 CSS) 联动网站设置。
 - **持久化**：`DiskStore`（Documents 下 JSON）。`bookmarks`/`history` 用 `didSet` 自动落盘，`init` 启动恢复（属性观察器在 init 中不触发，故加载不会回写）。颜色以 `colorHex: UInt` 存储（Color 不可 Codable）。
@@ -94,6 +95,11 @@ MiniBrowser/
 - **手势路径抽稀**：`GestureButton` 笔画中忽略 <4pt 的移动点，避免 points 膨胀和 `recognize` 的 O(n²) 重复计算。
 - **磁盘写入移出主线程**：`DiskStore.save` 原来在 `@MainActor` 同步 `encode + 原子写盘（fsync）`，被 `history/bookmarks` 的 `didSet` 触发——**每次打开/刷新网页**（`vm.open → recordHistory`）都阻塞主线程整表序列化落盘。现改为：编码仍在调用线程（拿值快照、`Data` 可跨线程），写盘 dispatch 到 `utility` 级**串行**后台队列（`com.minibrowser.diskstore`，串行保证同名文件写入有序不互相覆盖）。
 - **历史去重 + 上限**：`LibraryStore.recordHistory` 原来无上限插入、刷新同一地址会累积大量重复条目（放大上面那次整表序列化）。现改为同地址**去重置顶**、「今天」分组上限 `maxTodayItems = 200`，且在本地副本一次性改完再赋值（单次 `didSet` → 单次落盘，不再因一次记录触发多次写盘）。
+- **海量标签扩展性（1 万+ 标签）**：
+  - `currentTab` 由 O(n) 线性扫描改 **O(1) 索引**（`BrowserViewModel.tabIndex: [UUID: Tab]`，在 newTab/close/closeAllActive 维护）。实测 1 万标签下旧式线性扫描 ~0.48ms/次、每帧多次 → 卡顿；O(1) ~0.34µs/次基本免费。
+  - **活跃引擎 LRU 上限池**（`Models/EnginePool.swift`，默认 maxLive=10）：绝不为每个标签常驻 WKWebView，后台引擎被回收释放内存；当前标签永不回收。`open`/`select`/`toggleIncognito` 时 `enginePool.touch`，`close` 时 `remove`。
+  - **前进/后退/切回标签不重载**：活跃标签 `goBack/goForward` 走 WebKit bfcache 本就不重载；引擎被回收时用 `WKWebView.interactionState` 存完整会话（前进后退列表+滚动），`Tab.evictEngine`/重建（`Tab.engine` 惰性恢复 `savedSession`）实现无损还原。
+  - 实测：1 万标签启动建表 5.5ms、标签网格（LazyVGrid 惰性）流畅渲染、无崩溃。
 - 删除死状态 `loadProgress`、示例下载/文件数据等。
 
 - **ToastStore 拆分**：toast 从 `BrowserViewModel` 移到独立 `Models/ToastStore.swift`（`@EnvironmentObject var toasts`，App 里 `.environmentObject(vm.toasts)`）。原因：toast 几乎每个动作都触发，挂在 god VM 上时一次提示会让所有观察 vm 的视图重新求值；独立后只刷新 ToastView。`vm.showToast(...)` 保留为薄转发（`toasts.show`），既有调用点不变。

@@ -20,6 +20,13 @@ final class WebEngine: NSObject, ObservableObject {
     /// 长按链接时通过原生上下文菜单请求下载（由视图层接到 DownloadManager）。
     var onRequestDownload: ((URL) -> Void)?
 
+    /// 会话状态：完整的前进/后退列表 + 当前页 + 滚动位置（`WKWebView.interactionState`, iOS 15+）。
+    /// 用于引擎被 LRU 池回收后重建时无损恢复——避免丢失历史或从头加载页面。
+    var sessionState: Data? {
+        get { webView.interactionState as? Data }
+        set { if let newValue { webView.interactionState = newValue } }
+    }
+
     override init() {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true

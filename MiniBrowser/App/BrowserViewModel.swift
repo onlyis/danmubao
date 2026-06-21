@@ -75,6 +75,11 @@ final class BrowserViewModel: ObservableObject {
     @Published var incognitoTabs: [Tab] = []
     @Published var currentTabID: UUID?
 
+    /// id → Tab 索引，保证海量标签下 currentTab 查找为 O(1)（避免每帧线性扫描）。
+    private var tabIndex: [UUID: Tab] = [:]
+    /// 活跃引擎 LRU 上限池：海量标签时只保留最近 N 个 WKWebView，其余回收。
+    let enginePool = EnginePool()
+
     /// 手势按钮配置（持久化）
     @Published var gesture = GestureConfig() { didSet { DiskStore.save(gesture, to: "gestures.json") } }
 
@@ -83,6 +88,7 @@ final class BrowserViewModel: ObservableObject {
 
     init() {
         if let g = DiskStore.load(GestureConfig.self, from: "gestures.json") { gesture = g }
+        for t in tabs { tabIndex[t.id] = t }
         currentTabID = tabs.first?.id
     }
 
@@ -151,7 +157,11 @@ final class BrowserViewModel: ObservableObject {
     }
 
     var activeTabs: [Tab] { isIncognito ? incognitoTabs : tabs }
-    var currentTab: Tab? { activeTabs.first { $0.id == currentTabID } ?? activeTabs.first }
+    /// O(1) 查找：先走索引，命中且属当前模式则返回，否则回退到首个标签。
+    var currentTab: Tab? {
+        if let id = currentTabID, let t = tabIndex[id], t.isIncognito == isIncognito { return t }
+        return activeTabs.first
+    }
     var tabCount: Int { max(activeTabs.count, 1) }
 
     // MARK: - 导航动作
@@ -159,7 +169,10 @@ final class BrowserViewModel: ObservableObject {
         showSearch = false
         // 若当前没有可用标签（如刚切到无痕），先建一个
         if currentTab == nil { newTab() }
-        currentTab?.load(url, searchTemplate: searchTemplate)
+        if let t = currentTab {
+            t.load(url, searchTemplate: searchTemplate)
+            enginePool.touch(t, current: t)
+        }
         isBrowsing = true
         if !isIncognito { library.recordHistory(title: title ?? url, url: url) }
     }
@@ -176,6 +189,7 @@ final class BrowserViewModel: ObservableObject {
             isBrowsing = false
         } else {
             tab.activateIfNeeded(searchTemplate: searchTemplate)
+            enginePool.touch(tab, current: tab)
             isBrowsing = true
         }
         showTabs = false
@@ -193,6 +207,7 @@ final class BrowserViewModel: ObservableObject {
 
     func newTab() {
         let tab = Tab(isHome: true, isIncognito: isIncognito)
+        tabIndex[tab.id] = tab
         if isIncognito { incognitoTabs.insert(tab, at: 0) } else { tabs.insert(tab, at: 0) }
         currentTabID = tab.id
         goHome()
@@ -201,6 +216,8 @@ final class BrowserViewModel: ObservableObject {
 
     func close(_ tab: Tab) {
         let wasCurrent = tab.id == currentTabID
+        enginePool.remove(tab)
+        tabIndex[tab.id] = nil
         withAnimation {
             if isIncognito { incognitoTabs.removeAll { $0.id == tab.id } }
             else { tabs.removeAll { $0.id == tab.id } }
@@ -212,6 +229,8 @@ final class BrowserViewModel: ObservableObject {
     }
 
     func closeAllActive() {
+        let closing = activeTabs
+        for t in closing { enginePool.remove(t); tabIndex[t.id] = nil }
         withAnimation {
             if isIncognito { incognitoTabs.removeAll() } else { tabs.removeAll() }
         }
@@ -222,7 +241,13 @@ final class BrowserViewModel: ObservableObject {
     func toggleIncognito() {
         withAnimation { isIncognito.toggle() }
         currentTabID = activeTabs.first?.id
-        if let t = currentTab, !t.isHome { isBrowsing = true } else { isBrowsing = false }
+        if let t = currentTab, !t.isHome {
+            t.activateIfNeeded(searchTemplate: searchTemplate)
+            enginePool.touch(t, current: t)
+            isBrowsing = true
+        } else {
+            isBrowsing = false
+        }
     }
 }
 
