@@ -205,6 +205,11 @@ final class BrowserViewModel: ObservableObject {
         engine.printPage(jobName: currentTitle)
     }
 
+    func findInPage() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        engine.presentFind()
+    }
+
     init() {
         if let g = DiskStore.load(GestureConfig.self, from: "gestures.json") { gesture = g }
         if let e = DiskStore.load(SearchEngine.self, from: "search_engine.json") { searchEngine = e }

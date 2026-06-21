@@ -117,6 +117,7 @@ struct MainMenuSheet: View {
         case "保存PDF": vm.saveCurrentPDF(); dismiss()
         case "保存HTML": vm.saveCurrentHTML(); dismiss()
         case "打印": vm.printCurrent(); dismiss()
+        case "页面搜索", "站内搜索": vm.findInPage(); dismiss()
         case "电子书": vm.route = .reader; dismiss()
         case "下载资源", "下载当前资源": vm.showDownloadConfirm = true; dismiss()
         case "视频悬浮": vm.showVideoFloat = true; dismiss()

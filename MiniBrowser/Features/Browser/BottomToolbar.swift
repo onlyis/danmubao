@@ -3,7 +3,7 @@ import SwiftUI
 /// 工具栏按钮种类：可在「自定义底部工具栏按钮」里任意增删排序（1…8 个）。
 /// gesture 为特色项（画手势），可配置醒目或普通样式。
 enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
-    case back, forward, reload, home, menu, tabs, newTab, search
+    case back, forward, reload, home, menu, tabs, newTab, search, findInPage
     case bookmarks, history, downloads, files, settings
     case translate, reading, imageMode, qrScan, night, incognito, gesture
 
@@ -14,7 +14,8 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .back: return "后退"; case .forward: return "前进"; case .reload: return "刷新"
         case .home: return "主页"; case .menu: return "菜单"; case .tabs: return "标签页"
-        case .newTab: return "新标签"; case .search: return "搜索"; case .bookmarks: return "书签"
+        case .newTab: return "新标签"; case .search: return "搜索"; case .findInPage: return "页面查找"
+        case .bookmarks: return "书签"
         case .history: return "历史"; case .downloads: return "下载"; case .files: return "文件"
         case .settings: return "设置"; case .translate: return "翻译"; case .reading: return "阅读模式"
         case .imageMode: return "看图模式"; case .qrScan: return "扫码"; case .night: return "夜间模式"
@@ -27,6 +28,7 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
         case .reload: return "arrow.clockwise"; case .home: return "house"
         case .menu: return "line.3.horizontal"; case .tabs: return "square.on.square"
         case .newTab: return "plus.square"; case .search: return "magnifyingglass"
+        case .findInPage: return "doc.text.magnifyingglass"
         case .bookmarks: return "bookmark"; case .history: return "clock.arrow.circlepath"
         case .downloads: return "arrow.down.circle"; case .files: return "folder"
         case .settings: return "gearshape"; case .translate: return "character.bubble"
@@ -41,6 +43,7 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
         case .back: vm.back(); case .forward: vm.forward(); case .reload: vm.engine?.reload()
         case .home: vm.goHome(); case .menu: vm.showMenu = true; case .tabs: vm.showTabs = true
         case .newTab: vm.newTab(); case .search: vm.showSearch = true
+        case .findInPage: vm.findInPage()
         case .bookmarks: vm.route = .bookmarks; case .history: vm.route = .history
         case .downloads: vm.route = .downloads; case .files: vm.route = .files
         case .settings: vm.route = .settings; case .translate: vm.route = .translate

@@ -42,6 +42,7 @@ final class WebEngine: NSObject, ObservableObject {
         webView.allowsBackForwardNavigationGestures = true
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        webView.isFindInteractionEnabled = true   // 系统页面查找栏（含匹配计数/上下一个）
         setupObservers()
     }
 
@@ -113,6 +114,11 @@ final class WebEngine: NSObject, ObservableObject {
         webView.evaluateJavaScript("document.documentElement.outerHTML") { r, _ in
             completion(r as? String)
         }
+    }
+
+    /// 调起系统页面查找栏。
+    func presentFind() {
+        webView.findInteraction?.presentFindNavigator(showingReplace: false)
     }
 
     /// 调起系统打印面板。
