@@ -167,9 +167,10 @@ MiniBrowser/
 ## 5. 未完成 / 占位（明确告知用户的待办）
 
 - **插件体系 / 插件市场**：✅ 已搭框架（`Models/Plugin.swift` 内置目录 + `Models/PluginStore.swift` 状态持久化/引擎集成 + `Features/Plugins/PluginMarketView.swift`）。两类插件：`contentRule`（编译为 `WKContentRuleList`）与 `userScript`（复用 `UserScriptStore.wrap`）。`WebEngine.init` 注入。入口：设置 → 功能 → 插件市场（已取代原「广告拦截」单独入口）。**广告拦截现为插件**（`adblock.basic`，真实 `WKContentRuleList`，默认安装启用）。注意：① 规则编译是**异步**的，仅对之后新建标签生效；② WKContentRuleList 仅支持受限正则子集（交替组等会编译失败），失败只记录并跳过、不崩溃；③ 目录在代码内，仅安装/启用状态持久化到 `plugins.json`。后续可扩展：把更多内置功能收编为插件、接远程目录。
-- **iCloud 同步**：✅ 书签/历史已用 `NSUbiquitousKeyValueStore` 真实同步（`Models/CloudSync.swift` + `LibraryStore.persist/applyRemote`，含防回写守卫与 last-writer-wins）。entitlement 由 `project.yml` 生成（`MiniBrowser/Resources/MiniBrowser.entitlements`，已 gitignore）。**真机需在 Signing & Capabilities 勾选 iCloud → Key-value storage**；模拟器/未登录 iCloud 时静默降级不影响本地。规则/插件同步仍是占位。
+- **iCloud 同步**：代码已实现（`Models/CloudSync.swift` + `LibraryStore.persist/applyRemote`，`NSUbiquitousKeyValueStore`，含防回写守卫与 last-writer-wins），但 **entitlement 已暂时从 `project.yml` 移除**（个人 Team 真机签名过不去）。无 entitlement 时 CloudSync **静默降级**、不影响本地。恢复办法：把 `project.yml` 注释里的 `entitlements` 段加回 + 真机勾选 iCloud → Key-value storage。
 - **JS 扩展**：✅ 已真实注入（`Models/UserScriptStore.swift` + `WebEngine` 在 init 写入 `WKUserContentController`，按 match glob 包网址守卫）。编辑界面接真实存储。限制：编辑只对**之后新建的标签**生效（已创建引擎不热更新）。
 - **翻译**：UI 完整，未接真实翻译 API。**待决策**：选定翻译服务 + API Key，或用 iOS 17.4+ 系统 `TranslationSession`（部署目标 17.0，需 `@available` 降级）。
+- **搜索引擎**：✅ 已真实化（`SearchEngine` 模型 + 内置 6 家 + 自定义引擎，`vm.searchEngine` 持久化 `search_engine.json`/`custom_engines.json`，`WebEngine.normalize` 支持 `%s` 与追加两种模板）。入口：设置→搜索引擎 / 菜单→搜索引擎（route `.searchEngine`）。「搜索建议/AI 搜索/清除搜索历史」仍占位。
 - **二维码**：✅ 已真实化（生成 `CIQRCodeGenerator`、扫描 `AVCaptureMetadataOutput`）。仅「相册识别」按钮仍为占位（未接 `PHPicker` + `CIDetector`）。
 - **视频悬浮/画中画/投屏/倍速**：悬浮窗 UI 可拖拽吸附，但未接真实 `AVPlayer`/`AVPictureInPictureController`。
 - **看图模式**：✅ 已真实提取网页图片（`WebEngine.fetchImageURLs` + `AsyncImage`），✅ 批量保存到相册（`Models/ImageSaver.swift`，下载远程图后 `UIImageWriteToSavedPhotosAlbum`）+ 分享（`ShareLink`）。**漫画/电子书** 仍为渐变/书页占位，未解析真实长图或 epub/pdf。

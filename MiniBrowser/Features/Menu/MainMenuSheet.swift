@@ -111,6 +111,7 @@ struct MainMenuSheet: View {
         case "Cookie管理": vm.route = .cookies; dismiss()
         case "二维码": vm.route = .qrScanner; dismiss()
         case "JavaScript扩展": vm.route = .jsExtensions; dismiss()
+        case "搜索引擎": vm.route = .searchEngine; dismiss()
         case "电子书": vm.route = .reader; dismiss()
         case "下载资源", "下载当前资源": vm.showDownloadConfirm = true; dismiss()
         case "视频悬浮": vm.showVideoFloat = true; dismiss()

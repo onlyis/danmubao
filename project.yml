@@ -16,11 +16,12 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: MiniBrowser
-    entitlements:
-      path: MiniBrowser/Resources/MiniBrowser.entitlements
-      properties:
-        # iCloud 键值同步（书签/历史）。真机需在 Signing & Capabilities 勾选 iCloud → Key-value storage。
-        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
+    # iCloud 键值同步的 entitlement 已暂时移除（个人 Team 真机签名过不去）。
+    # CloudSync 代码保留，无 entitlement 时静默降级；需要时把下面 entitlements 配置加回即可：
+    #   entitlements:
+    #     path: MiniBrowser/Resources/MiniBrowser.entitlements
+    #     properties:
+    #       com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     info:
       path: MiniBrowser/Resources/Info.plist
       properties:

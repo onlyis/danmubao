@@ -73,51 +73,72 @@ struct CustomSettingsView: View {
     }
 }
 
-// MARK: - 搜索引擎
+// MARK: - 搜索引擎（真实：选择即生效并持久化，见 BrowserViewModel.searchEngine）
 struct SearchEngineView: View {
-    @State private var selected = "百度"
-    private let engines = ["百度", "Google", "Bing", "搜狗", "神马", "360", "DuckDuckGo"]
-    @State private var suggestions = true
+    @EnvironmentObject var vm: BrowserViewModel
 
     var body: some View {
         List {
             Section("默认搜索引擎") {
-                ForEach(engines, id: \.self) { e in
-                    Button { selected = e } label: {
-                        HStack {
-                            Text(e).foregroundStyle(Theme.Colors.primaryText)
+                ForEach(vm.allSearchEngines) { e in
+                    Button { Haptics.light(); vm.searchEngine = e } label: {
+                        HStack(spacing: Theme.Spacing.m) {
+                            SiteIconSmall(glyph: e.glyph, color: e.color)
+                            Text(e.name).foregroundStyle(Theme.Colors.primaryText)
                             Spacer()
-                            if e == selected { Image(systemName: "checkmark").foregroundStyle(Theme.Colors.accent) }
+                            if e.id == vm.searchEngine.id {
+                                Image(systemName: "checkmark").foregroundStyle(Theme.Colors.accent)
+                            }
+                        }
+                    }
+                    .swipeActions {
+                        // 仅自定义引擎可删除
+                        if vm.customEngines.contains(where: { $0.id == e.id }) {
+                            Button(role: .destructive) { vm.removeCustomEngine(e) } label: { Label("删除", systemImage: "trash") }
                         }
                     }
                 }
             }
             Section {
-                Toggle("搜索建议", isOn: $suggestions)
                 NavigationLink("自定义搜索引擎") { CustomEngineEditView() }
-                NavigationLink("AI 搜索", destination: PlaceholderSettings(title: "AI 搜索"))
-                Button("清除搜索历史") { }.foregroundStyle(Theme.Colors.danger)
+            } footer: {
+                Text("当前：\(vm.searchEngine.name)　\(vm.searchEngine.template)")
+                    .font(.system(size: 12, design: .monospaced))
             }
         }
         .navigationTitle("搜索引擎").navigationBarTitleDisplayMode(.inline)
+        .toolbar { dismissDoneIfRoot() }
     }
 }
 
 struct CustomEngineEditView: View {
+    @EnvironmentObject var vm: BrowserViewModel
+    @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var url = ""
-    @State private var asDefault = false
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
+        url.contains(".") && (url.contains("%s") || url.contains("="))
+    }
+
     var body: some View {
         Form {
             Section("名称") { TextField("搜索引擎名称", text: $name) }
             Section("搜索 URL") {
-                TextField("https://example.com/?q=%s", text: $url).autocorrectionDisabled().textInputAutocapitalization(.never)
-                Text("使用 %s 作为关键词占位符").font(.system(size: 12)).foregroundStyle(Theme.Colors.secondaryText)
+                TextField("https://example.com/?q=%s", text: $url)
+                    .autocorrectionDisabled().textInputAutocapitalization(.never).keyboardType(.URL)
+                Text("用 %s 作为关键词占位符；或以 ?q= 等结尾，关键词会追加到末尾。")
+                    .font(.system(size: 12)).foregroundStyle(Theme.Colors.secondaryText)
             }
-            Section { Toggle("设为默认", isOn: $asDefault) }
         }
         .navigationTitle("添加搜索引擎").navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("保存") { }.fontWeight(.semibold) } }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("保存") { vm.addCustomEngine(name: name, template: url); dismiss() }
+                    .fontWeight(.semibold).disabled(!canSave)
+            }
+        }
     }
 }
 

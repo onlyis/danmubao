@@ -32,8 +32,32 @@ final class BrowserViewModel: ObservableObject {
         if isIncognito || isNightMode { return .dark }
         return appearanceMode.scheme
     }
-    /// 默认搜索引擎模板
-    var searchTemplate = "https://www.bing.com/search?q="
+    /// 当前默认搜索引擎（持久化）。`searchTemplate` 由它派生，供 WebEngine.normalize 使用。
+    @Published var searchEngine: SearchEngine = SearchEngine.builtIn[0] {
+        didSet { DiskStore.save(searchEngine, to: "search_engine.json") }
+    }
+    /// 用户自定义搜索引擎（持久化）。
+    @Published var customEngines: [SearchEngine] = [] {
+        didSet { DiskStore.save(customEngines, to: "custom_engines.json") }
+    }
+    var searchTemplate: String { searchEngine.template }
+    var allSearchEngines: [SearchEngine] { SearchEngine.builtIn + customEngines }
+
+    /// 新增自定义引擎并设为当前。
+    func addCustomEngine(name: String, template: String) {
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let trimmedTpl = template.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty, !trimmedTpl.isEmpty else { return }
+        let e = SearchEngine(name: trimmedName, template: trimmedTpl,
+                             glyph: String(trimmedName.prefix(1)).uppercased(), colorHex: 0x0A84FF)
+        customEngines.removeAll { $0.id == e.id }   // 同名覆盖
+        customEngines.append(e)
+        searchEngine = e
+    }
+    func removeCustomEngine(_ e: SearchEngine) {
+        customEngines.removeAll { $0.id == e.id }
+        if searchEngine.id == e.id { searchEngine = SearchEngine.builtIn[0] }
+    }
 
     /// 当前激活标签的网页引擎
     var engine: WebEngine? { currentTab?.engine }
@@ -45,7 +69,7 @@ final class BrowserViewModel: ObservableObject {
     enum Route: Identifiable {
         case bookmarks, history, downloads, files, settings
         case reading, imageViewer, comic, toolbox, qrScanner, reader, translate
-        case jsExtensions, devtools, cookies, gestures, plugins
+        case jsExtensions, devtools, cookies, gestures, plugins, searchEngine
         var id: String { String(describing: self) }
     }
     @Published var route: Route?
@@ -91,6 +115,8 @@ final class BrowserViewModel: ObservableObject {
 
     init() {
         if let g = DiskStore.load(GestureConfig.self, from: "gestures.json") { gesture = g }
+        if let e = DiskStore.load(SearchEngine.self, from: "search_engine.json") { searchEngine = e }
+        if let c = DiskStore.load([SearchEngine].self, from: "custom_engines.json") { customEngines = c }
         // 恢复上次的标签（无痕标签不持久化）。属性观察器在 init 中不触发，恢复不会回写。
         if let state = DiskStore.load(TabsState.self, from: "tabs.json"), !state.tabs.isEmpty {
             tabs = state.tabs.map(Tab.init)

@@ -117,7 +117,11 @@ final class WebEngine: NSObject, ObservableObject {
             if let u = URL(string: "https://" + trimmed) { return u }
         }
         let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
-        return URL(string: searchTemplate + encoded) ?? URL(string: "https://www.bing.com")!
+        // 模板含 %s 则替换，否则把关键词追加到末尾（兼容内置与自定义引擎两种写法）。
+        let urlStr = searchTemplate.contains("%s")
+            ? searchTemplate.replacingOccurrences(of: "%s", with: encoded)
+            : searchTemplate + encoded
+        return URL(string: urlStr) ?? URL(string: "https://www.bing.com")!
     }
 }
 

@@ -12,6 +12,26 @@ struct QuickLink: Identifiable, Hashable {
     var symbol: String? = nil
 }
 
+// MARK: - 搜索引擎
+struct SearchEngine: Identifiable, Hashable, Codable {
+    var name: String
+    /// 查询模板：含 `%s` 则替换为关键词，否则把编码后的关键词追加到末尾（如 `.../search?q=`）。
+    var template: String
+    var glyph: String
+    var colorHex: UInt
+    var id: String { name }
+    var color: Color { Color(hex: colorHex) }
+
+    static let builtIn: [SearchEngine] = [
+        .init(name: "Bing", template: "https://www.bing.com/search?q=", glyph: "b", colorHex: 0x008373),
+        .init(name: "Google", template: "https://www.google.com/search?q=", glyph: "G", colorHex: 0x4285F4),
+        .init(name: "百度", template: "https://www.baidu.com/s?wd=", glyph: "百", colorHex: 0x2932E1),
+        .init(name: "搜狗", template: "https://www.sogou.com/web?query=", glyph: "搜", colorHex: 0xFB6022),
+        .init(name: "360搜索", template: "https://www.so.com/s?q=", glyph: "3", colorHex: 0x10B266),
+        .init(name: "DuckDuckGo", template: "https://duckduckgo.com/?q=", glyph: "D", colorHex: 0xDE5833),
+    ]
+}
+
 // MARK: - 书签
 struct Bookmark: Identifiable, Hashable, Codable {
     var id = UUID()
