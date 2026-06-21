@@ -499,7 +499,7 @@ case "识别图中码": qrAutoPickPhoto = true; route = .qrScanner
         // 拦截跳转（开关型，停留不关弹层）
         case "拦截跳转": toggleBlockRedirects(); return false
         // 查看站点证书（动作型，关闭宿主弹层后弹证书 sheet）
-        case "查看证书", "查看站点证书": viewCertificate()
+        case "站点证书", "查看证书", "查看站点证书": viewCertificate()
         case "媒体嗅探": openMediaSniffer()
 
 case "稍后读": saveToReadingList()
@@ -1057,6 +1057,7 @@ func saveToReadingList() {
         engine.onDidFinish = { [weak self, weak tab] in
             guard let self, let tab else { return }
             self.refreshVideoPresence(for: tab)   // 加载完成后重检测视频（驱动悬浮入口显隐）
+            if self.defaultVideoRate != 1.0 { tab.engine.videoSetRate(self.defaultVideoRate) }   // 应用默认倍速（无视频时为空操作）
             guard !tab.isIncognito, let pending = tab.pendingHistoryURL else { return }
             let title = tab.engine.title
             guard !title.isEmpty else { return }
@@ -1144,7 +1145,9 @@ func saveToReadingList() {
         tabIndex[tab.id] = tab
         if isIncognito { incognitoTabs.append(tab) } else { tabs.append(tab) }   // 新标签在末尾
         currentTabID = tab.id
-        goHome()
+        // 设置「新标签默认打开主页」时直接加载主页地址，否则空白新标签页。
+        let home = homepageURL.trimmingCharacters(in: .whitespaces)
+        if newTabOpensHomepage, !home.isEmpty { open(url: home) } else { goHome() }
         pagePopTrigger += 1   // 触发新页面左下角弹出动画
         scheduleTabPersist()
     }

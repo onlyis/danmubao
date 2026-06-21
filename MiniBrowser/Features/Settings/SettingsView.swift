@@ -18,10 +18,10 @@ struct SettingsView: View {
 
             Section("基础") {
                 nav("通用设置", "gearshape", Color(hex: 0x8E8E93)) { GeneralSettingsView() }
-                nav("主页设置", "house", Color(hex: 0xFF9500)) { PlaceholderSettings(title: "主页设置") }
+                nav("主页设置", "house", Color(hex: 0xFF9500)) { HomeSettingsView() }
                 nav("自定义设置", "slider.horizontal.3", Color(hex: 0x5856D6)) { CustomSettingsView() }
                 nav("搜索引擎", "magnifyingglass", Color(hex: 0x0A84FF)) { SearchEngineView() }
-                nav("标签页", "square.on.square", Color(hex: 0x34C759)) { PlaceholderSettings(title: "标签页") }
+                nav("标签页", "square.on.square", Color(hex: 0x34C759)) { TabSettingsView() }
                 nav("长按快捷操作", "hand.tap", Color(hex: 0xFF2D55)) { LongPressActionsView() }
             }
 
@@ -37,7 +37,7 @@ struct SettingsView: View {
             Section("功能") {
                 nav("插件市场", "puzzlepiece.extension.fill", Theme.Colors.safe) { PluginMarketView() }
                 nav("网页翻译", "character.bubble", Color(hex: 0x0A84FF)) { TranslateView() }
-                nav("视频播放", "play.rectangle", Color(hex: 0xFF375F)) { PlaceholderSettings(title: "视频播放") }
+                nav("视频播放", "play.rectangle", Color(hex: 0xFF375F)) { VideoSettingsView() }
                 nav("文件管理", "folder", Color(hex: 0x5AC8FA)) { PlaceholderSettings(title: "文件管理") }
                 nav("电子书阅读器", "book", Color(hex: 0xFF9500)) { EbookLibraryView() }
                 nav("JavaScript 扩展", "curlybraces", Color(hex: 0x5856D6)) { JSExtensionsView() }
