@@ -70,6 +70,7 @@ struct HomeView: View {
     private func submit(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty else { return }
+        vm.recordSearch(t)
         vm.open(url: t, title: t)
         exitSearch()
     }
@@ -105,6 +106,22 @@ private struct InlineSearchBar: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .onSubmit { onSubmit(query) }
+                        .toolbar {
+                            // 键盘上方 URL 助手栏：快捷输入常用片段
+                            ToolbarItemGroup(placement: .keyboard) {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(["https://", "www.", ".com", ".cn", ".net", "/"], id: \.self) { frag in
+                                            Button(frag) { query += frag }
+                                                .font(.system(size: 14, weight: .medium))
+                                                .buttonStyle(.bordered)
+                                                .controlSize(.small)
+                                                .tint(Theme.Colors.secondaryText)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     if !query.isEmpty {
                         Button { query = "" } label: {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.Colors.tertiaryText)
@@ -146,26 +163,42 @@ private struct InlineSearchBar: View {
     }
 }
 
-/// 搜索态下方：剪贴板网址 + 搜索建议（点击即用当前引擎跳转）。
+/// 搜索态下方：搜索历史 chips + 剪贴板 + 历史记录(favicon+URL) + 搜索建议。
 private struct SearchSuggestionList: View {
+    @EnvironmentObject var vm: BrowserViewModel
     let query: String
     var onPick: (String) -> Void
     private let base = ["天行九歌", "github trending", "swiftui 教程", "天气预报"]
 
     /// 仅用 hasURLs 探测（不触发系统粘贴提示），真正读取放到用户点击时。
     private var hasClipURL: Bool { UIPasteboard.general.hasURLs }
-    private var items: [String] {
+    private var suggestions: [String] {
         query.isEmpty ? base : base.filter { $0.localizedCaseInsensitiveContains(query) } + [query]
+    }
+    /// 浏览历史（扁平、去重 url、按 query 过滤，取前 8）
+    private var historyItems: [HistoryItem] {
+        var seen = Set<String>()
+        let all = vm.library.history.flatMap(\.items).filter { seen.insert($0.url).inserted }
+        let filtered = query.isEmpty ? all : all.filter {
+            $0.title.localizedCaseInsensitiveContains(query) || $0.url.localizedCaseInsensitiveContains(query)
+        }
+        return Array(filtered.prefix(8))
     }
 
     var body: some View {
         List {
+            // 搜索历史 chips（query 为空时）
+            if query.isEmpty && !vm.searchHistory.isEmpty {
+                Section {
+                    chipsRow
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                }
+            }
+
             if hasClipURL {
                 Section {
                     Button {
-                        if let u = UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string {
-                            onPick(u)
-                        }
+                        if let u = UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string { onPick(u) }
                     } label: {
                         HStack(spacing: Theme.Spacing.m) {
                             Image(systemName: "doc.on.clipboard").foregroundStyle(Theme.Colors.accent)
@@ -174,8 +207,26 @@ private struct SearchSuggestionList: View {
                     }
                 }
             }
+
+            if !historyItems.isEmpty {
+                Section(query.isEmpty ? "历史记录" : "相关历史") {
+                    ForEach(historyItems) { item in
+                        Button { onPick(item.url) } label: {
+                            HStack(spacing: Theme.Spacing.m) {
+                                SiteIconSmall(glyph: item.glyph, color: item.color)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title).font(.system(size: 15)).foregroundStyle(Theme.Colors.primaryText).lineLimit(1)
+                                    Text(item.url).font(.system(size: 12)).foregroundStyle(Theme.Colors.secondaryText).lineLimit(1)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+            }
+
             Section("搜索建议") {
-                ForEach(items, id: \.self) { s in
+                ForEach(suggestions, id: \.self) { s in
                     Button { onPick(s) } label: {
                         HStack(spacing: Theme.Spacing.m) {
                             Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundStyle(Theme.Colors.tertiaryText)
@@ -188,6 +239,29 @@ private struct SearchSuggestionList: View {
         }
         .listStyle(.insetGrouped)
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    /// 搜索历史 chips：左侧清空按钮 + 横向滚动的可点 chip（长按删单条）
+    private var chipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Button { vm.clearSearchHistory() } label: {
+                    Image(systemName: "trash").font(.system(size: 15)).foregroundStyle(Theme.Colors.secondaryText)
+                }
+                ForEach(vm.searchHistory, id: \.self) { q in
+                    Button { onPick(q) } label: {
+                        Text(q).font(.system(size: 13)).foregroundStyle(Theme.Colors.primaryText)
+                            .lineLimit(1)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Theme.Colors.groupedBackground, in: Capsule())
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) { vm.removeSearch(q) } label: { Label("删除", systemImage: "trash") }
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
     }
 }
 

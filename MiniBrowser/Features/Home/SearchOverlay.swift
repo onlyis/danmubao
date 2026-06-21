@@ -98,6 +98,7 @@ struct SearchOverlay: View {
 
     private func go() {
         guard !text.isEmpty else { return }
+        vm.recordSearch(text)
         vm.open(url: text, title: text)
         dismiss()
     }

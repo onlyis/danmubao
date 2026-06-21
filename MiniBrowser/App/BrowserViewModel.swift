@@ -44,6 +44,20 @@ final class BrowserViewModel: ObservableObject {
     var searchTemplate: String { searchEngine.template }
     var allSearchEngines: [SearchEngine] { SearchEngine.builtIn + customEngines }
 
+    /// 搜索历史（最近输入的关键词/网址，去重置顶，上限 12，持久化）
+    @Published var searchHistory: [String] = [] { didSet { DiskStore.save(searchHistory, to: "search_history.json") } }
+    func recordSearch(_ q: String) {
+        let t = q.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty else { return }
+        var h = searchHistory
+        h.removeAll { $0 == t }
+        h.insert(t, at: 0)
+        if h.count > 12 { h.removeLast(h.count - 12) }
+        searchHistory = h
+    }
+    func removeSearch(_ q: String) { searchHistory.removeAll { $0 == q } }
+    func clearSearchHistory() { searchHistory = [] }
+
     /// 新增自定义引擎并设为当前。
     func addCustomEngine(name: String, template: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
@@ -215,6 +229,7 @@ final class BrowserViewModel: ObservableObject {
         if let e = DiskStore.load(SearchEngine.self, from: "search_engine.json") { searchEngine = e }
         if let c = DiskStore.load([SearchEngine].self, from: "custom_engines.json") { customEngines = c }
         if let t = DiskStore.load([ToolbarItemKind].self, from: "toolbar.json") { toolbarItems = t }
+        if let sh = DiskStore.load([String].self, from: "search_history.json") { searchHistory = sh }
         // 不变式校正：gesture ∈ toolbarItems ⟺ 放置方式为工具栏（防旧数据不一致导致空槽）
         let gestureInToolbar = toolbarItems.contains(.gesture)
         if (gesture.placement == .toolbar) != gestureInToolbar {
