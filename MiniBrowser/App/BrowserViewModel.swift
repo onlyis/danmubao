@@ -396,8 +396,12 @@ final class BrowserViewModel: ObservableObject {
     // MARK: - 导航动作
     func open(url: String, title: String? = nil) {
         showSearch = false
-        // 若当前没有可用标签（如刚切到无痕），先建一个
-        if currentTab == nil { newTab() }
+        if currentTab == nil {
+            newTab()   // 没有可用标签（如刚切到无痕）
+        } else if !isBrowsing, currentTab?.didLoad == true {
+            // 从主页打开新链接、且当前标签已加载过别的页面：新建标签，避免看到上一个页面闪现
+            newTab()
+        }
         if let t = currentTab {
             t.load(url, searchTemplate: searchTemplate)
             enginePool.touch(t, current: t)

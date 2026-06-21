@@ -10,7 +10,7 @@ struct MainMenuSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            quickActionRow
+            header
             Hairline().padding(.horizontal, Theme.Spacing.l)
 
             TabView(selection: $page) {
@@ -27,25 +27,26 @@ struct MainMenuSheet: View {
         .background((vm.isIncognito ? Color(hex: 0x111114) : Theme.Colors.card).ignoresSafeArea())
     }
 
-    // 顶部网页快捷操作
-    private var quickActionRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Theme.Spacing.xl) {
-                QuickOp(symbol: "arrow.clockwise", title: "刷新") { vm.engine?.reload(); dismiss() }
-                QuickOp(symbol: "doc.on.doc", title: "复制链接") {
-                    UIPasteboard.general.string = vm.currentURL
-                    dismiss(); vm.showToast("已复制链接", symbol: "doc.on.doc")
-                }
-                QuickOp(symbol: "square.and.arrow.up", title: "分享") { dismiss() }
-                QuickOp(symbol: "bookmark", title: "加书签") {
-                    vm.addBookmark(title: vm.currentTitle, url: vm.currentURL); dismiss()
-                }
-                QuickOp(symbol: "plus.app", title: "加到主页") { dismiss() }
-                QuickOp(symbol: "xmark.square", title: "关闭标签") { dismiss() }
+    // 顶部装饰性标题头（盾牌 + 当前页 + 更多）
+    private var header: some View {
+        HStack(spacing: Theme.Spacing.s) {
+            Image(systemName: "shield.lefthalf.filled")
+                .font(.system(size: 19))
+                .foregroundStyle(vm.isAdBlockOn ? Theme.Colors.safe : Theme.Colors.secondaryText)
+            Text(vm.isBrowsing ? (vm.currentTitle.isEmpty ? vm.currentURL : vm.currentTitle) : "主页")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.Colors.primaryText)
+                .lineLimit(1)
+            Spacer()
+            Button { dismiss(); vm.route = .settings } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Theme.Colors.secondaryText)
             }
-            .padding(.horizontal, Theme.Spacing.l)
-            .padding(.vertical, Theme.Spacing.m)
         }
+        .padding(.horizontal, Theme.Spacing.l)
+        .padding(.top, Theme.Spacing.s)
+        .padding(.bottom, Theme.Spacing.m)
     }
 
     private func menuGrid(_ items: [MenuAction]) -> some View {
@@ -131,23 +132,6 @@ struct MainMenuSheet: View {
         case "主页": vm.goHome(); dismiss()
         default: dismiss()
         }
-    }
-}
-
-private struct QuickOp: View {
-    var symbol: String, title: String, action: () -> Void
-    var body: some View {
-        Button(action: { Haptics.light(); action() }) {
-            VStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20))
-                    .foregroundStyle(Theme.Colors.accent)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Theme.Colors.accent.opacity(0.1)))
-                Text(title).font(.system(size: 11)).foregroundStyle(Theme.Colors.secondaryText)
-            }
-        }
-        .buttonStyle(PressableStyle())
     }
 }
 

@@ -47,22 +47,21 @@ private struct SearchInputField: View {
                     .toolbar {
                         ToolbarItemGroup(placement: .keyboard) {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    // 搜索引擎：随手在输入法上方选择（图标 only，小，无边框，小圆角）
+                                HStack(spacing: 16) {
+                                    // 点击引擎图标：带着输入内容用该引擎搜索（轻量图标，无边框，小圆角）
                                     ForEach(vm.allSearchEngines) { e in
-                                        Button { Haptics.light(); vm.searchEngine = e } label: {
-                                            SiteIcon(glyph: e.glyph, color: e.color, size: 30, corner: 7)
-                                                .opacity(e.id == vm.searchEngine.id ? 1 : 0.55)
+                                        Button { tapEngine(e) } label: {
+                                            SiteIcon(glyph: e.glyph, color: e.color, size: 30, corner: 8)
+                                                .opacity(e.id == vm.searchEngine.id ? 1 : 0.45)
                                         }
                                     }
-                                    Divider().frame(height: 22)
-                                    ForEach(["https://", ".com", ".cn", "/"], id: \.self) { frag in
+                                    Divider().frame(height: 20)
+                                    ForEach([".com", "/"], id: \.self) { frag in
                                         Button(frag) { query += frag }
-                                            .font(.system(size: 14, weight: .medium))
-                                            .buttonStyle(.bordered).controlSize(.small)
-                                            .tint(Theme.Colors.secondaryText)
+                                            .font(.system(size: 15)).foregroundStyle(Theme.Colors.secondaryText)
                                     }
                                 }
+                                .padding(.horizontal, 4)
                             }
                         }
                     }
@@ -79,12 +78,20 @@ private struct SearchInputField: View {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
-                    .strokeBorder(Theme.Colors.accent.opacity(0.5), lineWidth: 1.5)
+                    .strokeBorder(Theme.Colors.separator, lineWidth: 1)
             }
 
             Button("取消") { focused = false; onCancel() }.font(.system(size: 16))
         }
         .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { focused = true } }
+    }
+
+    /// 点击引擎：设为默认并带着当前内容用该引擎搜索（内容为空则仅切换默认）。
+    private func tapEngine(_ e: SearchEngine) {
+        Haptics.light()
+        vm.searchEngine = e
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty { onSubmit(q) }
     }
 }
 

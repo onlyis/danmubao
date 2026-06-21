@@ -44,7 +44,7 @@ struct RootView: View {
             .scaleEffect(pagePop, anchor: .bottomLeading)   // 新建标签：从左下角弹出（快）
             .onChange(of: vm.pagePopTrigger) { _, _ in
                 pagePop = 0.1
-                withAnimation(.spring(response: 0.08, dampingFraction: 0.7)) { pagePop = 1 }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) { pagePop = 1 }
             }
 
             // 底部固定工具栏（主页态不创建引擎）
