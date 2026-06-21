@@ -1,0 +1,13 @@
+# Xcode / Swift
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+
+# xcodegen 生成的工程（由 project.yml 生成，可重建）
+MiniBrowser.xcodeproj/
+# entitlements 同样由 project.yml 的 entitlements.properties 生成，可重建
+MiniBrowser/Resources/MiniBrowser.entitlements
+
+.DS_Store

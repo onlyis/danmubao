@@ -1,0 +1,64 @@
+name: MiniBrowser
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+targets:
+  MiniBrowser:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: MiniBrowser
+    entitlements:
+      path: MiniBrowser/Resources/MiniBrowser.entitlements
+      properties:
+        # iCloud 键值同步（书签/历史）。真机需在 Signing & Capabilities 勾选 iCloud → Key-value storage。
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
+    info:
+      path: MiniBrowser/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: 浏览器
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIStatusBarStyle: UIStatusBarStyleDefault
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        NSCameraUsageDescription: 用于扫描二维码。
+        NSPhotoLibraryAddUsageDescription: 用于保存图片与二维码到相册。
+        NSPhotoLibraryUsageDescription: 用于从相册选择图片识别二维码。
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.minibrowser
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # 真机运行：自动签名。填入你的 Team ID（或在 Xcode 里选择 Team）。
+        # 模拟器构建在命令行用 CODE_SIGNING_ALLOWED=NO 跳过签名。
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_IDENTITY: "Apple Development"
+schemes:
+  MiniBrowser:
+    build:
+      targets:
+        MiniBrowser: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    archive:
+      config: Release
