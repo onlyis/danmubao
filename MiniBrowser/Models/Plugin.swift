@@ -60,6 +60,19 @@ extension Plugin {
             installed: true, enabled: true   // 默认随包安装启用，开箱即用
         ),
         Plugin(
+            id: "noimage.block",
+            name: "无图模式 / 省流",
+            author: "MiniBrowser",
+            summary: "阻止图片加载并隐藏图片元素，省流量更清爽",
+            detail: "基于 WKContentRuleList：拦截所有图片资源请求（省流量），并对 img/picture/视频封面做 CSS 隐藏。可在菜单「无图模式」或网站设置里一键切换，切换后当前页会重载生效。",
+            symbol: "photo.on.rectangle.angled",
+            tint: 0x34C759,
+            category: .enhance,
+            kind: .contentRule(json: noImageRuleJSON),
+            version: "1.0",
+            installed: true, enabled: false   // 随包安装、默认不启用，由「无图模式」开关切换
+        ),
+        Plugin(
             id: "enhance.cleanfloat",
             name: "清理悬浮广告（示例）",
             author: "社区",
@@ -101,6 +114,14 @@ extension Plugin {
       {"trigger":{"url-filter":"adnxs\\\\.com"},"action":{"type":"block"}},
       {"trigger":{"url-filter":"scorecardresearch\\\\.com"},"action":{"type":"block"}},
       {"trigger":{"url-filter":".*"},"action":{"type":"css-display-none","selector":".ad, .ads, .advert, .adsbox, [id^=ad-], [class*=banner-ad]"}}
+    ]
+    """
+
+    /// 无图模式规则：拦截图片资源请求 + 隐藏图片元素。
+    private static let noImageRuleJSON = """
+    [
+      {"trigger":{"url-filter":".*","resource-type":["image"]},"action":{"type":"block"}},
+      {"trigger":{"url-filter":".*"},"action":{"type":"css-display-none","selector":"img, picture, video[poster]"}}
     ]
     """
 }

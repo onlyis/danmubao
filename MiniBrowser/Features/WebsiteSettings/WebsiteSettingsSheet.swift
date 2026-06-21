@@ -36,7 +36,9 @@ struct WebsiteSettingsSheet: View {
                     Toggle(isOn: Binding(get: { vm.isAdBlockOn }, set: { _ in vm.toggleAdBlock() })) {
                         rowLabel("广告拦截", "shield.lefthalf.filled")
                     }
-                    Toggle(isOn: $vm.isNoImageMode) { rowLabel("无图模式", "photo.on.rectangle.angled") }
+                    Toggle(isOn: Binding(get: { vm.isNoImageMode }, set: { _ in vm.toggleNoImage() })) {
+                        rowLabel("无图模式", "photo.on.rectangle.angled")
+                    }
                     Toggle(isOn: $clipboard) { rowLabel("允许访问剪贴板", "doc.on.clipboard") }
                     Toggle(isOn: $newTabLinks) { rowLabel("新标签页打开链接", "plus.square.on.square") }
                 }

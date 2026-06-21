@@ -65,6 +65,14 @@ final class WebEngine: NSObject, ObservableObject {
         load(Self.normalize(text, searchTemplate: searchTemplate))
     }
     func load(_ url: URL) { webView.load(URLRequest(url: url)) }
+    /// 重新套用当前所有启用的内容拦截规则（插件启停后调用），可选随即重载当前页使其立即生效。
+    func refreshContentRules(reload: Bool) {
+        let controller = webView.configuration.userContentController
+        controller.removeAllContentRuleLists()
+        PluginStore.shared.compiledRuleLists.forEach(controller.add)
+        if reload { webView.reload() }
+    }
+
     func goBack() { webView.goBack() }
     func goForward() { webView.goForward() }
     func reload() { webView.reload() }

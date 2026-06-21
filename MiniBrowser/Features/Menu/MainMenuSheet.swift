@@ -117,7 +117,7 @@ struct MainMenuSheet: View {
         case "视频悬浮": vm.showVideoFloat = true; dismiss()
         case "无痕模式": vm.toggleIncognito()
         case "夜间模式": withAnimation { vm.isNightMode.toggle() }
-        case "无图模式": vm.isNoImageMode.toggle()
+        case "无图模式": vm.toggleNoImage()
         case "广告拦截": vm.toggleAdBlock()
         case "标记广告": vm.showMarkAds = true; dismiss()
         case "电脑版": vm.isDesktopMode.toggle()

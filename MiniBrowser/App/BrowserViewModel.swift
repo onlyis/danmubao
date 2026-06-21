@@ -10,7 +10,8 @@ final class BrowserViewModel: ObservableObject {
     @Published var isBrowsing: Bool = false
     @Published var isIncognito: Bool = false
     @Published var isNightMode: Bool = false
-    @Published var isNoImageMode: Bool = false
+    /// 无图模式：派生自无图插件是否启用（同广告拦截，单一真相源 = PluginStore）。
+    @Published private(set) var isNoImageMode: Bool = false
     /// 广告拦截状态：派生自广告类插件是否启用（单一真相源 = PluginStore）。
     /// 只读镜像——通过 `toggleAdBlock()` 驱动插件，避免开关与真实拦截脱节。
     @Published private(set) var isAdBlockOn: Bool = true
@@ -107,6 +108,11 @@ final class BrowserViewModel: ObservableObject {
     /// 活跃引擎 LRU 上限池：海量标签时只保留最近 N 个 WKWebView，其余回收。
     let enginePool = EnginePool()
 
+    /// Combine 订阅容器（插件状态镜像、内容规则重载）。
+    private var cancellables = Set<AnyCancellable>()
+    /// 一次性标志：内容规则下次重编译完成后重载当前页（由广告/无图开关置位）。
+    private var reloadCurrentOnRulesChange = false
+
     /// 手势按钮配置（持久化）
     @Published var gesture = GestureConfig() { didSet { DiskStore.save(gesture, to: "gestures.json") } }
 
@@ -126,11 +132,26 @@ final class BrowserViewModel: ObservableObject {
         }
         for t in tabs { tabIndex[t.id] = t }
 
-        // 广告拦截开关镜像广告类插件的启用状态（PluginStore 为单一真相源）。
+        // 广告拦截 / 无图开关镜像对应插件的启用状态（PluginStore 为单一真相源）。
         // assign(to:) 不强引用 self，订阅时即用当前值同步一次。
         PluginStore.shared.$plugins
             .map { $0.contains { $0.category == .adblock && $0.installed && $0.enabled } }
             .assign(to: &$isAdBlockOn)
+        PluginStore.shared.$plugins
+            .map { $0.contains { $0.id == "noimage.block" && $0.installed && $0.enabled } }
+            .assign(to: &$isNoImageMode)
+
+        // 内容规则重编译完成后（异步），若刚由开关触发则重载当前页使其立即生效。
+        PluginStore.shared.$compiledRuleLists
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self, self.reloadCurrentOnRulesChange else { return }
+                self.reloadCurrentOnRulesChange = false
+                if self.isBrowsing, let t = self.currentTab, t.hasEngine {
+                    t.engine.refreshContentRules(reload: true)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     /// 切换广告拦截：驱动所有已安装的广告类插件启用/停用；isAdBlockOn 经由上面的管道回流刷新。
@@ -139,7 +160,17 @@ final class BrowserViewModel: ObservableObject {
         for p in PluginStore.shared.plugins where p.category == .adblock && p.installed {
             PluginStore.shared.setEnabled(p, target)
         }
+        reloadCurrentOnRulesChange = true
         showToast(target ? "已开启广告拦截" : "已关闭广告拦截", symbol: "shield.lefthalf.filled")
+    }
+
+    /// 切换无图模式：驱动无图内容规则插件；切换后当前页重载生效。
+    func toggleNoImage() {
+        guard let p = PluginStore.shared.plugins.first(where: { $0.id == "noimage.block" }) else { return }
+        let target = !isNoImageMode
+        PluginStore.shared.setEnabled(p, target)
+        reloadCurrentOnRulesChange = true
+        showToast(target ? "已开启无图模式" : "已关闭无图模式", symbol: "photo.on.rectangle.angled")
     }
 
     // MARK: - 标签持久化（合并写，避免连续增删反复整表编码）

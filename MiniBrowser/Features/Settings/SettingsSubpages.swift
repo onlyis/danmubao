@@ -227,7 +227,7 @@ struct NoImageView: View {
     var body: some View {
         List {
             Section {
-                Toggle("全局无图模式", isOn: $vm.isNoImageMode)
+                Toggle("全局无图模式", isOn: Binding(get: { vm.isNoImageMode }, set: { _ in vm.toggleNoImage() }))
                 Toggle("智能无图", isOn: .constant(false))
                 Toggle("仅 Wi-Fi 加载图片", isOn: .constant(true))
             }

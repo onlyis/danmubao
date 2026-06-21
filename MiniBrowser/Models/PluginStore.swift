@@ -10,8 +10,8 @@ final class PluginStore: ObservableObject {
     static let shared = PluginStore()
 
     @Published private(set) var plugins: [Plugin]
-    /// 已编译的内容拦截规则（供 WebEngine.init 同步取用）
-    private(set) var compiledRuleLists: [WKContentRuleList] = []
+    /// 已编译的内容拦截规则（供 WebEngine.init 同步取用）。@Published 以便启停后通知当前页重载生效。
+    @Published private(set) var compiledRuleLists: [WKContentRuleList] = []
 
     init() {
         let states = DiskStore.load([String: PluginState].self, from: "plugins.json") ?? [:]
