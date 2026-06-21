@@ -142,7 +142,7 @@ final class BrowserViewModel: ObservableObject {
     @Published var gesture = GestureConfig() { didSet { DiskStore.save(gesture, to: "gestures.json") } }
 
     /// 底部工具栏按钮顺序（可自定义、持久化）。`.gesture` 仅在手势为「工具栏」放置时存在。
-    @Published var toolbarItems: [ToolbarItemKind] = [.back, .forward, .menu, .tabs, .home] {
+    @Published var toolbarItems: [ToolbarItemKind] = [.night, .search, .menu, .tabs, .home] {
         didSet { DiskStore.save(toolbarItems, to: "toolbar.json") }
     }
 
@@ -181,6 +181,8 @@ final class BrowserViewModel: ObservableObject {
 
     /// 新建标签时自增，触发主体页面从左下角弹出的动画（RootView 观察）
     @Published private(set) var pagePopTrigger = 0
+    /// 后台打开链接时自增，触发标签按钮的小动画（替代 toast）
+    @Published private(set) var bgOpenTrigger = 0
 
     /// 查看源码弹层
     struct SourcePreview: Identifiable { let id = UUID(); let code: String }
@@ -396,14 +398,9 @@ final class BrowserViewModel: ObservableObject {
     // MARK: - 导航动作
     func open(url: String, title: String? = nil) {
         showSearch = false
-        if currentTab == nil {
-            newTab()   // 没有可用标签（如刚切到无痕）
-        } else if !isBrowsing, currentTab?.didLoad == true {
-            // 从主页打开新链接、且当前标签已加载过别的页面：新建标签，避免看到上一个页面闪现
-            newTab()
-        }
+        if currentTab == nil { newTab() }   // 没有可用标签（如刚切到无痕）
         if let t = currentTab {
-            t.load(url, searchTemplate: searchTemplate)
+            t.load(url, searchTemplate: searchTemplate)   // 本页面打开；加载遮罩避免看到旧页面
             enginePool.touch(t, current: t)
         }
         isBrowsing = true
@@ -421,17 +418,10 @@ final class BrowserViewModel: ObservableObject {
         guard !u.isEmpty else { return }
         let tab = Tab(isHome: false, isIncognito: isIncognito)
         tabIndex[tab.id] = tab
-        // 插到当前标签之后
-        if isIncognito {
-            let i = (incognitoTabs.firstIndex { $0.id == currentTabID }).map { $0 + 1 } ?? incognitoTabs.count
-            incognitoTabs.insert(tab, at: min(i, incognitoTabs.count))
-        } else {
-            let i = (tabs.firstIndex { $0.id == currentTabID }).map { $0 + 1 } ?? tabs.count
-            tabs.insert(tab, at: min(i, tabs.count))
-        }
+        if isIncognito { incognitoTabs.append(tab) } else { tabs.append(tab) }   // 末尾
         tab.load(u, searchTemplate: searchTemplate)
         if !isIncognito { library.recordHistory(title: u, url: u) }
-        showToast("已在后台打开", symbol: "rectangle.stack.badge.plus")
+        bgOpenTrigger += 1   // 小动画替代提示
         scheduleTabPersist()
     }
 
@@ -492,7 +482,7 @@ final class BrowserViewModel: ObservableObject {
     func newTab() {
         let tab = Tab(isHome: true, isIncognito: isIncognito)
         tabIndex[tab.id] = tab
-        if isIncognito { incognitoTabs.insert(tab, at: 0) } else { tabs.insert(tab, at: 0) }
+        if isIncognito { incognitoTabs.append(tab) } else { tabs.append(tab) }   // 新标签在末尾
         currentTabID = tab.id
         goHome()
         pagePopTrigger += 1   // 触发新页面左下角弹出动画

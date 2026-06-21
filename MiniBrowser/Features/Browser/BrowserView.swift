@@ -19,6 +19,10 @@ private struct BrowserContent: View {
             progressBar
             ZStack(alignment: .bottomTrailing) {
                 WebViewContainer(engine: engine)
+                    .overlay {
+                        // 显式加载新地址时遮住旧页面（首帧提交后撤掉）
+                        if engine.navigating { Theme.Colors.card.ignoresSafeArea() }
+                    }
                     // 长按：有选中文本 → 划词浮层；无选中（多为长按链接/图片）→ 让位给原生菜单（含「下载链接」）
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.5).onEnded { _ in

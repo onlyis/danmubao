@@ -57,7 +57,7 @@ struct RootView: View {
         // 底部主菜单
         .sheet(isPresented: $vm.showMenu) {
             MainMenuSheet()
-                .presentationDetents([.height(440), .large])
+                .presentationDetents([.height(560), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
         }

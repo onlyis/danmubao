@@ -12,6 +12,8 @@ final class WebEngine: NSObject, ObservableObject {
     @Published var canGoForward = false
     @Published var progress: Double = 0
     @Published var isLoading = false
+    /// 显式加载新地址期间为 true（遮住旧页面，避免切换时看到上一个页面）；首帧提交后清除。
+    @Published var navigating = false
 
     /// 桌面版 UA（Safari on macOS）
     private let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
@@ -67,7 +69,7 @@ final class WebEngine: NSObject, ObservableObject {
     func submit(_ text: String, searchTemplate: String) {
         load(Self.normalize(text, searchTemplate: searchTemplate))
     }
-    func load(_ url: URL) { webView.load(URLRequest(url: url)) }
+    func load(_ url: URL) { navigating = true; webView.load(URLRequest(url: url)) }
     /// 重新套用当前所有启用的内容拦截规则（插件启停后调用），可选随即重载当前页使其立即生效。
     func refreshContentRules(reload: Bool) {
         let controller = webView.configuration.userContentController
@@ -177,14 +179,17 @@ extension WebEngine: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLoading = true
     }
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        navigating = false   // 新页面首帧已就绪，撤掉加载遮罩
+    }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        isLoading = false
+        isLoading = false; navigating = false
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        isLoading = false
+        isLoading = false; navigating = false
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        isLoading = false
+        isLoading = false; navigating = false
     }
 }
 
@@ -193,8 +198,10 @@ extension WebEngine: WKUIDelegate {
     func webView(_ webView: WKWebView,
                  contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo,
                  completionHandler: @escaping (UIContextMenuConfiguration?) -> Void) {
-        guard let url = elementInfo.linkURL else { completionHandler(nil); return }
+        // 链接：追加自定义动作；图片等其它元素：保留系统默认菜单（保存图片/拷贝等）
+        let url = elementInfo.linkURL
         let config = UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] suggested in
+            guard let url else { return UIMenu(title: "", children: suggested) }
             let background = UIAction(title: "在后台打开",
                                       image: UIImage(systemName: "rectangle.stack.badge.plus")) { _ in
                 self?.onOpenInBackground?(url)

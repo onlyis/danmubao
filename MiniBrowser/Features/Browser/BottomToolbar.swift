@@ -54,6 +54,19 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
         case .gesture: break   // 由 GestureButton 覆盖层承接
         }
     }
+
+    /// 长按快捷操作（默认：夜间→历史，搜索→收藏，菜单→搜索，标签→新建，主页→关闭）
+    @MainActor func longPress(_ vm: BrowserViewModel) {
+        switch self {
+        case .night: vm.route = .history
+        case .search: vm.route = .bookmarks
+        case .menu: vm.showSearch = true
+        case .tabs: vm.newTab()
+        case .home: if let t = vm.currentTab { vm.close(t) }
+        case .back, .forward: vm.showTabs = true
+        default: vm.showMenu = true
+        }
+    }
 }
 
 /// 底部固定工具栏：按 `vm.toolbarItems` 顺序渲染，始终可见。
@@ -80,12 +93,16 @@ struct BottomToolbar: View {
     @ViewBuilder
     private func button(for item: ToolbarItemKind) -> some View {
         switch item {
-        case .back:    ToolbarButton(symbol: "chevron.left", enabled: vm.isBrowsing) { vm.back() }
+        case .back:    ToolbarButton(symbol: "chevron.left", enabled: vm.isBrowsing,
+                                     action: { vm.back() }, longPress: { item.longPress(vm) })
         case .forward: ForwardButton(engine: engine) { vm.forward() }
-        case .tabs:    TabsButton(count: vm.tabCount) { vm.showTabs = true }
-        case .home:    ToolbarButton(symbol: vm.isBrowsing ? "house" : "house.fill") { vm.goHome() }
+        case .tabs:    TabsButton(count: vm.tabCount, pulse: vm.bgOpenTrigger,
+                                  action: { vm.showTabs = true }, longPress: { item.longPress(vm) })
+        case .home:    ToolbarButton(symbol: vm.isBrowsing ? "house" : "house.fill",
+                                     action: { vm.goHome() }, longPress: { item.longPress(vm) })
         case .gesture: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)  // 占位，覆盖层绘制(醒目/普通两种样式)
-        default:       ToolbarButton(symbol: item.symbol) { item.perform(vm) }
+        default:       ToolbarButton(symbol: item.symbol, active: item == .night && vm.isNightMode,
+                                     action: { item.perform(vm) }, longPress: { item.longPress(vm) })
         }
     }
 }
@@ -116,24 +133,32 @@ private struct DisabledForward: View {
 private struct ToolbarButton: View {
     var symbol: String
     var enabled: Bool = true
+    var active: Bool = false
     var action: () -> Void
+    var longPress: (() -> Void)? = nil
 
     var body: some View {
         Button(action: { if enabled { Haptics.light(); action() } }) {
             Image(systemName: symbol)
                 .font(.system(size: 21, weight: .regular))
-                .foregroundStyle(enabled ? Theme.Colors.toolbarIcon : Theme.Colors.toolbarDisabled)
+                .foregroundStyle(active ? Theme.Colors.accent : (enabled ? Theme.Colors.toolbarIcon : Theme.Colors.toolbarDisabled))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+            if let longPress { Haptics.soft(); longPress() }
+        })
     }
 }
 
-/// 标签页按钮：方框中显示当前标签数量
+/// 标签页按钮：方框中显示当前标签数量；后台打开时脉冲一下
 private struct TabsButton: View {
     var count: Int
+    var pulse: Int = 0
     var action: () -> Void
+    var longPress: (() -> Void)? = nil
+    @State private var scale: CGFloat = 1
 
     var body: some View {
         Button(action: { Haptics.light(); action() }) {
@@ -145,10 +170,18 @@ private struct TabsButton: View {
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(Theme.Colors.toolbarIcon)
                 }
+                .scaleEffect(scale)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+            if let longPress { Haptics.soft(); longPress() }
+        })
+        .onChange(of: pulse) { _, _ in
+            scale = 1.35
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.5)) { scale = 1 }
+        }
     }
 }
 

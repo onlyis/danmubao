@@ -28,11 +28,6 @@ struct GestureSettingsView: View {
                     .pickerStyle(.segmented)
                 } header: {
                     Text("放置方式")
-                    if vm.gesture.placement == .toolbar {
-                        Toggle(isOn: $vm.gesture.distinctIcon) {
-                            Label("工具栏图标醒目显示", systemImage: "sparkles")
-                        }
-                    }
                 } footer: {
                     Text(vm.gesture.placement == .floating
                          ? "悬浮按钮可拖动；拖到屏幕左右边缘会贴边停靠，只露出一部分。"
@@ -60,6 +55,7 @@ struct GestureSettingsView: View {
                     }
                     Toggle(isOn: $vm.gesture.enableCircle) { Label("识别圆形手势 ↻ ↺", systemImage: "circle.dashed") }
                     Toggle(isOn: $vm.gesture.haptics) { Label("触觉反馈", systemImage: "waveform") }
+                    Toggle(isOn: $vm.gesture.distinctIcon) { Label("工具栏图标醒目显示", systemImage: "sparkles") }
                 }
             }
 

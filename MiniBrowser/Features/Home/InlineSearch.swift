@@ -72,13 +72,13 @@ private struct SearchInputField: View {
                 }
             }
             .padding(.horizontal, Theme.Spacing.m)
-            .frame(height: Theme.Size.searchBarHeight)
+            .frame(height: 40)
             .background {
-                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous).fill(Theme.Colors.card)
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.Colors.card)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
-                    .strokeBorder(Theme.Colors.separator, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Theme.Colors.separator, lineWidth: 0.5)
             }
 
             Button("取消") { focused = false; onCancel() }.font(.system(size: 16))

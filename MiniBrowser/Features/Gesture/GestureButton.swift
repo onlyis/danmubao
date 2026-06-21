@@ -28,10 +28,17 @@ struct GestureButton: View {
                     trail
                     hud(in: geo.size)
                 }
-                button
-                    .opacity(restingOpacity(in: geo.size))
-                    .position(center(in: geo.size))
-                    .gesture(drag(in: geo.size))
+                if isDockedLine {
+                    // 贴边停靠：锁成一条边缘线（类似小米边缘手势条），按住拖出即画手势
+                    dockedLine
+                        .position(dockedLinePosition(in: geo.size))
+                        .gesture(drag(in: geo.size))
+                } else {
+                    button
+                        .opacity(restingOpacity(in: geo.size))
+                        .position(center(in: geo.size))
+                        .gesture(drag(in: geo.size))
+                }
             }
             .coordinateSpace(name: coordSpace)
         }
@@ -75,6 +82,24 @@ struct GestureButton: View {
             .opacity(phase == .gesturing ? 0.85 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phase)
         }
+    }
+
+    /// 悬浮模式、空闲、且贴到左右边缘 → 锁成边缘线。
+    private var isDockedLine: Bool {
+        phase == .idle && vm.gesture.placement == .floating
+            && (vm.gesture.posX < 0.06 || vm.gesture.posX > 0.94)
+    }
+    /// 边缘手势线
+    private var dockedLine: some View {
+        Capsule()
+            .fill(Theme.Colors.accent.opacity(0.75))
+            .frame(width: 5, height: 52)
+            .shadow(color: .black.opacity(0.15), radius: 2)
+    }
+    private func dockedLinePosition(in size: CGSize) -> CGPoint {
+        let x: CGFloat = vm.gesture.posX < 0.5 ? 3 : size.width - 3
+        let y = min(max(vm.gesture.posY * size.height, 60), size.height - 60)
+        return CGPoint(x: x, y: y)
     }
 
     /// 停靠在边缘且空闲时半透明（露一部分在视野内）。
