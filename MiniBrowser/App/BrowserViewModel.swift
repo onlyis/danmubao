@@ -28,9 +28,9 @@ final class BrowserViewModel: ObservableObject {
         var scheme: ColorScheme? { self == .light ? .light : (self == .dark ? .dark : nil) }
     }
 
-    /// 最终强制的配色（无痕/夜间始终深色）
+    /// 最终强制的配色（仅夜间始终深色；无痕不影响页面深浅）
     var resolvedScheme: ColorScheme? {
-        if isIncognito || isNightMode { return .dark }
+        if isNightMode { return .dark }
         return appearanceMode.scheme
     }
     /// 当前默认搜索引擎（持久化）。`searchTemplate` 由它派生，供 WebEngine.normalize 使用。

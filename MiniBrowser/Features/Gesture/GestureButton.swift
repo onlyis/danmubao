@@ -89,16 +89,19 @@ struct GestureButton: View {
         phase == .idle && vm.gesture.placement == .floating
             && (vm.gesture.posX < 0.06 || vm.gesture.posX > 0.94)
     }
-    /// 边缘手势线
+    /// 边缘手势线：细线可见，但触摸感应区放大（避免与系统边缘手势冲突、更易抓住）
     private var dockedLine: some View {
         Capsule()
             .fill(Theme.Colors.accent.opacity(0.75))
-            .frame(width: 5, height: 52)
+            .frame(width: 5, height: 56)
             .shadow(color: .black.opacity(0.15), radius: 2)
+            .frame(width: 36, height: 100)   // 更大的手指感应区
+            .contentShape(Rectangle())
     }
     private func dockedLinePosition(in size: CGSize) -> CGPoint {
-        let x: CGFloat = vm.gesture.posX < 0.5 ? 3 : size.width - 3
-        let y = min(max(vm.gesture.posY * size.height, 60), size.height - 60)
+        // 让可见细线贴边，同时感应区向内延伸
+        let x: CGFloat = vm.gesture.posX < 0.5 ? 12 : size.width - 12
+        let y = min(max(vm.gesture.posY * size.height, 70), size.height - 70)
         return CGPoint(x: x, y: y)
     }
 

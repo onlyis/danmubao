@@ -7,9 +7,9 @@ struct RootView: View {
     @Environment(\.colorScheme) private var systemScheme
     @State private var pagePop: CGFloat = 1
 
-    /// 当前是否处于深色（用于 OLED 纯黑判断）
+    /// 当前是否处于深色（用于 OLED 纯黑判断）。无痕不再影响深浅，深浅交给夜间模式控制。
     private var isDark: Bool {
-        if vm.isIncognito || vm.isNightMode { return true }
+        if vm.isNightMode { return true }
         switch vm.appearanceMode {
         case .light: return false
         case .dark: return true
@@ -19,9 +19,9 @@ struct RootView: View {
 
     @ViewBuilder
     private var rootBackground: some View {
-        if !vm.isBrowsing && vm.wallpaper != .none && !vm.isIncognito {
+        if !vm.isBrowsing && vm.wallpaper != .none {
             WallpaperBackground(wallpaper: vm.wallpaper)
-        } else if vm.isIncognito || (isDark && vm.oledBlack) {
+        } else if isDark && vm.oledBlack {
             Color.black
         } else {
             Theme.Colors.background
@@ -49,9 +49,6 @@ struct RootView: View {
 
             // 底部固定工具栏（主页态不创建引擎）
             BottomToolbar(engine: vm.isBrowsing ? vm.currentTab?.engine : nil)
-
-            // 悬浮手势按钮（覆盖全屏以承载笔画轨迹）
-            if vm.gesture.enabled { GestureButton() }
         }
         .preferredColorScheme(vm.resolvedScheme)
         // 底部主菜单
@@ -60,6 +57,7 @@ struct RootView: View {
                 .presentationDetents([.height(560), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
+                .presentationBackground(vm.isIncognito ? Color(hex: 0x111114) : Theme.Colors.card)
         }
         // 标签页管理：覆盖层瞬时显示/消失（不显示标签淡出动画，只看新页面弹出）
         .overlay {
@@ -84,6 +82,8 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.12), value: vm.showSearch)
+        // 悬浮手势按钮：全局最顶层，覆盖搜索/标签等所有页面（仅按钮区域拦截触摸）
+        .overlay { if vm.gesture.enabled { GestureButton() } }
         // 下载确认
         .sheet(isPresented: $vm.showDownloadConfirm) {
             DownloadConfirmSheet()

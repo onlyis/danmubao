@@ -45,11 +45,9 @@ struct TabsView: View {
                 }
             }
             .onAppear {
-                // 打开时滚动到当前标签
+                // 打开即定位到当前标签（无动画，像本来就在那）
                 if let id = vm.currentTabID {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
-                    }
+                    DispatchQueue.main.async { proxy.scrollTo(id, anchor: .center) }
                 }
             }
             }
