@@ -10,7 +10,20 @@ final class EnginePool {
     private let maxLive: Int
     private var order: [Tab] = []   // 队尾 = 最近使用
 
-    init(maxLive: Int = 10) { self.maxLive = maxLive }
+    /// 默认按设备物理内存自适应上限：低端机保留更少活引擎，进一步压低内存占用。
+    init(maxLive: Int? = nil) {
+        self.maxLive = maxLive ?? Self.adaptiveMaxLive()
+    }
+
+    private static func adaptiveMaxLive() -> Int {
+        let gb = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
+        switch gb {
+        case ..<2:  return 3
+        case ..<4:  return 5
+        case ..<6:  return 8
+        default:    return 10
+        }
+    }
 
     /// 标记某标签引擎为最近使用，并按需回收最久未用的后台引擎。
     func touch(_ tab: Tab, current: Tab?) {

@@ -21,6 +21,7 @@
 - 工程由 **xcodegen** 从 `project.yml` 生成（`MiniBrowser.xcodeproj` 已被 `.gitignore` 忽略，可随时重建）
 - Bundle id：`com.example.minibrowser`，部署目标 iOS 17.0，仅 iPhone
 - `Info.plist` 由 `project.yml` 的 `info.properties` 生成（含 `NSAppTransportSecurity.NSAllowsArbitraryLoads=true` 以便加载任意网页）
+- **轻量**：零第三方依赖（纯 SwiftUI + WebKit），无大图资源。`project.yml` Release 配置开启 `-Osize` + strip 符号 + `DEAD_CODE_STRIPPING` + 资源 space 优化：Release 二进制 9.1MB→3.0MB（fat），真机单架构约 1.4MB。改体积相关只动 `project.yml`，勿直接改 pbxproj。
 
 ### 构建 / 运行
 
@@ -80,7 +81,7 @@ MiniBrowser/
   - 弹层（菜单/标签/网站设置/搜索/下载确认）各用一个 `Bool` 开关 + sheet/cover。
 - **多标签独立引擎**：`Tab` 是**引用类型**（`@MainActor ObservableObject`），每个 Tab 拥有自己的 `WebEngine`（封装 `WKWebView`）。
   - `vm.currentTab` / `vm.engine`（= currentTab.engine）。切换标签 = 改 `currentTabID`。`currentTab` 走 `tabIndex: [UUID: Tab]` 做 **O(1)** 查找（海量标签防卡顿）。
-  - **引擎 LRU 池**（`EnginePool`，maxLive=10）：标签很多时只保留最近用的 N 个 WKWebView，后台引擎 `Tab.evictEngine()` 回收（存 `interactionState`），重新激活时 `Tab.engine` 惰性恢复。当前标签永不回收。
+  - **引擎 LRU 池**（`EnginePool`，maxLive 按设备内存自适应 3/5/8/10）：标签很多时只保留最近用的 N 个 WKWebView，后台引擎 `Tab.evictEngine()` 回收（存 `interactionState`），重新激活时 `Tab.engine` 惰性恢复。当前标签永不回收。
   - 视图通过 `@ObservedObject` 观察具体 `Tab` / `WebEngine`（因为嵌套 ObservableObject 不会自动透传）。`BottomToolbar` 的前进键用 `ForwardButton` 包一层 `@ObservedObject engine` 才能响应 `canGoForward`。
 - **WebEngine**：KVO 观察 `estimatedProgress/title/url/canGoBack/canGoForward`，`WKNavigationDelegate` 管理 loading；`setDesktop`(切 UA 重载) / `applyNight`(注入反色 CSS) 联动网站设置。
 - **持久化**：`DiskStore`（Documents 下 JSON）。`bookmarks`/`history` 用 `didSet` 自动落盘，`init` 启动恢复（属性观察器在 init 中不触发，故加载不会回写）。颜色以 `colorHex: UInt` 存储（Color 不可 Codable）。

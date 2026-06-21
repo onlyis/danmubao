@@ -9,6 +9,20 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # 体积优化：死代码消除（链接期一并裁剪）
+    DEAD_CODE_STRIPPING: YES
+  configs:
+    # Release 主打体积：-Osize 优化、strip 符号、资源按空间优化
+    Release:
+      SWIFT_OPTIMIZATION_LEVEL: "-Osize"
+      SWIFT_COMPILATION_MODE: wholemodule
+      GCC_OPTIMIZATION_LEVEL: s
+      DEPLOYMENT_POSTPROCESSING: YES
+      STRIP_INSTALLED_PRODUCT: YES
+      STRIP_STYLE: all
+      STRIP_SWIFT_SYMBOLS: YES
+      ASSETCATALOG_COMPILER_OPTIMIZATION: space
+      SWIFT_DISABLE_SAFETY_CHECKS: NO
 targets:
   MiniBrowser:
     type: application
