@@ -18,14 +18,31 @@ struct GestureSettingsView: View {
             }
 
             if vm.gesture.enabled {
+                Section {
+                    Picker(selection: $vm.gesture.placement) {
+                        ForEach(GesturePlacement.allCases) { Text($0.rawValue).tag($0) }
+                    } label: {
+                        Label("放置方式", systemImage: "square.grid.2x2")
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("放置方式")
+                } footer: {
+                    Text(vm.gesture.placement == .floating
+                         ? "悬浮按钮可拖动；拖到屏幕左右边缘会贴边停靠，只露出一部分。"
+                         : "固定在底部工具栏上方居中，像一个图标。")
+                }
+
                 Section("手势控制") {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
-                            Label("灵敏度", systemImage: "dial.medium")
+                            Label("直线容差", systemImage: "scribble.variable")
                             Spacer()
-                            Text(sensitivityText).font(.system(size: 13)).foregroundStyle(Theme.Colors.secondaryText)
+                            Text(straightnessText).font(.system(size: 13)).foregroundStyle(Theme.Colors.secondaryText)
                         }
-                        Slider(value: $vm.gesture.sensitivity, in: 0.5...1.6, step: 0.1)
+                        Slider(value: $vm.gesture.straightness, in: 0...1, step: 0.1)
+                        Text("越大，画得弯一点的线也会被识别成一条直线，不易被拆成多段。")
+                            .font(.system(size: 12)).foregroundStyle(Theme.Colors.secondaryText)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
@@ -71,11 +88,11 @@ struct GestureSettingsView: View {
         }
     }
 
-    private var sensitivityText: String {
-        switch vm.gesture.sensitivity {
-        case ..<0.8: return "迟钝"
-        case ..<1.2: return "标准"
-        default: return "灵敏"
+    private var straightnessText: String {
+        switch vm.gesture.straightness {
+        case ..<0.34: return "精确"
+        case ..<0.67: return "标准"
+        default: return "宽松"
         }
     }
 

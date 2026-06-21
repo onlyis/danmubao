@@ -99,24 +99,33 @@ struct GestureRule: Identifiable, Codable, Hashable {
     ]
 }
 
-// MARK: - 配置（含按钮启用、位置、灵敏度等，整体持久化）
+// MARK: - 放置方式
+enum GesturePlacement: String, Codable, CaseIterable, Identifiable {
+    case floating = "悬浮按钮"
+    case bottomDock = "底部居中"
+    var id: String { rawValue }
+}
+
+// MARK: - 配置（含按钮启用、位置、直线容差等，整体持久化）
 struct GestureConfig: Codable {
     var enabled: Bool = true
-    /// 归一化位置 0...1
+    /// 归一化位置 0...1（仅悬浮模式）
     var posX: Double = 0.93
     var posY: Double = 0.80
     var rules: [GestureRule] = GestureRule.defaults
-    /// 灵敏度 0.5(迟钝)…1.6(灵敏)：越大识别一段方向所需位移越小。
-    var sensitivity: Double = 1.0
-    /// 悬浮按钮大小倍率 0.8…1.4。
+    /// 放置方式：悬浮 / 底部居中。
+    var placement: GesturePlacement = .floating
+    /// 直线容差 0(精确,易分段)…1(宽松,弯曲也当直线)：越大，画得弯的线越容易被当成一段直线。
+    var straightness: Double = 0.5
+    /// 按钮大小倍率 0.8…1.4。
     var buttonSize: Double = 1.0
     /// 是否识别圆形手势。
     var enableCircle: Bool = true
     /// 命中时是否触觉反馈。
     var haptics: Bool = true
 
-    /// 识别一段方向所需的最小位移（由灵敏度反推）。
-    var recognizeSegment: CGFloat { CGFloat(26.0 / max(0.4, sensitivity)) }
+    /// 直线容差角（度）：相邻段方向偏离当前直线段在此角度内不算转向。
+    var straightnessToleranceDeg: Double { 25 + straightness * 50 }   // 25°…75°
 
     init() {}
     /// 容错解码：旧配置缺新字段时用默认值，避免整份配置丢失。
@@ -126,7 +135,8 @@ struct GestureConfig: Codable {
         posX         = try c.decodeIfPresent(Double.self, forKey: .posX) ?? 0.93
         posY         = try c.decodeIfPresent(Double.self, forKey: .posY) ?? 0.80
         rules        = try c.decodeIfPresent([GestureRule].self, forKey: .rules) ?? GestureRule.defaults
-        sensitivity  = try c.decodeIfPresent(Double.self, forKey: .sensitivity) ?? 1.0
+        placement    = try c.decodeIfPresent(GesturePlacement.self, forKey: .placement) ?? .floating
+        straightness = try c.decodeIfPresent(Double.self, forKey: .straightness) ?? 0.5
         buttonSize   = try c.decodeIfPresent(Double.self, forKey: .buttonSize) ?? 1.0
         enableCircle = try c.decodeIfPresent(Bool.self, forKey: .enableCircle) ?? true
         haptics      = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
@@ -135,20 +145,36 @@ struct GestureConfig: Codable {
 
 // MARK: - 识别器：路径点 → 方向序列（或圆形）
 enum GestureRecognizer {
-    /// segment：判定一段方向所需的最小位移；detectCircle：是否优先识别圆形。
-    static func recognize(_ points: [CGPoint], segment: CGFloat = 26, detectCircle: Bool = true) -> [GestureDirection] {
+    /// segment：判定一段方向所需的最小位移。
+    /// toleranceDeg：直线容差角——线偏离当前直线段在此角度内不算转向（弯一点也当直线）。
+    /// detectCircle：是否优先识别圆形。
+    static func recognize(_ points: [CGPoint], segment: CGFloat = 26,
+                          toleranceDeg: Double = 50, detectCircle: Bool = true) -> [GestureDirection] {
         guard points.count > 1 else { return [] }
         if detectCircle, let circle = circle(points) { return [circle] }
         var result: [GestureDirection] = []
         var anchor = points[0]
+        var runAngle: Double? = nil   // 当前直线段的参考角（度）
         for p in points.dropFirst() {
             let dx = p.x - anchor.x, dy = p.y - anchor.y
             if hypot(dx, dy) < segment { continue }
+            let angle = atan2(dy, dx) * 180 / .pi
+            // 仍在当前直线段容差内：视作同一直线，继续累积（不动 anchor，弯曲被吸收）
+            if let ra = runAngle, abs(angleDelta(angle, ra)) <= toleranceDeg { continue }
             let dir = GestureDirection.from(dx: dx, dy: dy)
             if result.last != dir { result.append(dir) }
+            runAngle = angle
             anchor = p
         }
         return result
+    }
+
+    /// 两角之差，归一化到 -180…180。
+    private static func angleDelta(_ a: Double, _ b: Double) -> Double {
+        var d = a - b
+        while d > 180 { d -= 360 }
+        while d < -180 { d += 360 }
+        return d
     }
 
     /// 圆形识别：累计相邻线段的有符号转角，总转角接近 ±360° 即判为圆。

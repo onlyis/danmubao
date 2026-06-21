@@ -14,7 +14,10 @@ struct GestureButton: View {
     @State private var liftWork: DispatchWorkItem?
 
     private let coordSpace = "gestureRoot"
-    private var radius: CGFloat { 27 * vm.gesture.buttonSize }
+    private var radius: CGFloat {
+        let base: CGFloat = vm.gesture.placement == .bottomDock ? 22 : 27   // 底部居中更像工具栏图标
+        return base * vm.gesture.buttonSize
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -25,6 +28,7 @@ struct GestureButton: View {
                     hud(in: geo.size)
                 }
                 button
+                    .opacity(restingOpacity(in: geo.size))
                     .position(center(in: geo.size))
                     .gesture(drag(in: geo.size))
             }
@@ -48,6 +52,13 @@ struct GestureButton: View {
         .scaleEffect(phase == .gesturing ? 1.12 : (phase == .moving ? 1.18 : 1))
         .opacity(phase == .gesturing ? 0.85 : 1)
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phase)
+    }
+
+    /// 停靠在边缘且空闲时半透明（露一部分在视野内）。
+    private func restingOpacity(in size: CGSize) -> CGFloat {
+        guard phase == .idle, vm.gesture.placement == .floating else { return 1 }
+        let x = vm.gesture.posX * size.width
+        return (x < radius || x > size.width - radius) ? 0.5 : 1
     }
 
     // MARK: - 轨迹
@@ -91,13 +102,19 @@ struct GestureButton: View {
 
     // MARK: - 位置
     private func center(in size: CGSize) -> CGPoint {
+        // 底部居中：固定在工具栏上方中间，不可移动
+        if vm.gesture.placement == .bottomDock {
+            return CGPoint(x: size.width / 2, y: size.height - Theme.Size.toolbarHeight - radius - 10)
+        }
         if phase == .moving, let livePos { return clamp(livePos, in: size) }
         return clamp(CGPoint(x: vm.gesture.posX * size.width, y: vm.gesture.posY * size.height), in: size)
     }
+    /// 悬浮模式：水平允许约 60% 拖出边缘（保留一部分在视野内），竖直留常规边距。
     private func clamp(_ p: CGPoint, in size: CGSize) -> CGPoint {
-        let m = radius + 6
-        return CGPoint(x: min(max(p.x, m), size.width - m),
-                       y: min(max(p.y, m), size.height - m))
+        let mx = radius * 0.4
+        let my = radius + 6
+        return CGPoint(x: min(max(p.x, mx), size.width - mx),
+                       y: min(max(p.y, my), size.height - my))
     }
 
     // MARK: - 手势
@@ -108,11 +125,14 @@ struct GestureButton: View {
                 case .idle:
                     phase = .deciding
                     points = [v.location]
-                    let work = DispatchWorkItem {
-                        if phase == .deciding { phase = .moving; livePos = v.location; Haptics.soft() }
+                    // 仅悬浮模式可长按拾起移动；底部居中固定不动
+                    if vm.gesture.placement == .floating {
+                        let work = DispatchWorkItem {
+                            if phase == .deciding { phase = .moving; livePos = v.location; Haptics.soft() }
+                        }
+                        liftWork = work
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
                     }
-                    liftWork = work
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
                 case .deciding:
                     if hypot(v.translation.width, v.translation.height) > 12 {
                         liftWork?.cancel()
@@ -124,7 +144,7 @@ struct GestureButton: View {
                     if let last = points.last,
                        hypot(v.location.x - last.x, v.location.y - last.y) < 4 { break }
                     points.append(v.location)
-                    recognized = GestureRecognizer.recognize(points, segment: vm.gesture.recognizeSegment, detectCircle: vm.gesture.enableCircle)
+                    recognized = GestureRecognizer.recognize(points, toleranceDeg: vm.gesture.straightnessToleranceDeg, detectCircle: vm.gesture.enableCircle)
                     matched = vm.matchGesture(recognized)
                 case .moving:
                     livePos = v.location
@@ -134,14 +154,19 @@ struct GestureButton: View {
                 liftWork?.cancel()
                 switch phase {
                 case .gesturing:
-                    let dirs = GestureRecognizer.recognize(points, segment: vm.gesture.recognizeSegment, detectCircle: vm.gesture.enableCircle)
+                    let dirs = GestureRecognizer.recognize(points, toleranceDeg: vm.gesture.straightnessToleranceDeg, detectCircle: vm.gesture.enableCircle)
                     if let action = vm.matchGesture(dirs) {
                         vm.perform(action)
                     } else if !dirs.isEmpty {
                         vm.showToast("未匹配手势 \(dirs.glyphs)", symbol: "questionmark.circle")
                     }
                 case .moving:
-                    vm.gesture.posX = min(max(v.location.x / size.width, 0.05), 0.95)
+                    // 贴边停靠：拖近左右边缘时吸附并只露一部分；否则停在落点
+                    var x = v.location.x
+                    let edge = radius * 1.5
+                    if x < edge { x = radius * 0.4 }
+                    else if x > size.width - edge { x = size.width - radius * 0.4 }
+                    vm.gesture.posX = min(max(x / size.width, 0.0), 1.0)
                     vm.gesture.posY = min(max(v.location.y / size.height, 0.08), 0.92)
                 case .deciding:
                     vm.route = .gestures      // 轻点打开配置
