@@ -39,40 +39,50 @@ struct TabsView: View {
 
     private var topBar: some View {
         HStack {
-            Button("完成") { dismiss() }.font(.system(size: 16, weight: .medium))
+            Color.clear.frame(width: 44, height: 1)
             Spacer()
             Text("\(activeTabs.count) 个标签页")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.Colors.primaryText)
+                .foregroundStyle(vm.isIncognito ? .white : Theme.Colors.primaryText)
             Spacer()
-            Button { vm.newTab(); dismiss() } label: {
-                Image(systemName: "plus").font(.system(size: 18, weight: .medium))
+            Button(role: .destructive) { vm.closeAllActive() } label: {
+                Image(systemName: "trash").font(.system(size: 17))
             }
+            .frame(width: 44)
+            .disabled(activeTabs.isEmpty)
         }
         .padding(.horizontal, Theme.Spacing.l)
         .frame(height: 50)
     }
 
+    /// 底部三段式：无痕/普通切换 ｜ 新建 ｜ 完成（参考 Alook）
     private var bottomBar: some View {
-        HStack {
-            ModeTab(symbol: "globe", title: "普通", active: !vm.isIncognito) {
-                if vm.isIncognito { vm.toggleIncognito() }
-            }
-            ModeTab(symbol: "eyeglasses", title: "无痕", active: vm.isIncognito) {
-                if !vm.isIncognito {
-                    vm.toggleIncognito()
-                    if vm.incognitoTabs.isEmpty { vm.newTab() }
+        HStack(spacing: 0) {
+            Button {
+                Haptics.light(); vm.toggleIncognito()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: vm.isIncognito ? "globe" : "eyeglasses")
+                    Text(vm.isIncognito ? "普通浏览" : "无痕浏览")
                 }
+                .font(.system(size: 15))
+                .foregroundStyle(vm.isIncognito ? Color.white : Theme.Colors.primaryText)
+                .frame(maxWidth: .infinity)
             }
-            Spacer()
-            Button { } label: { Image(systemName: "arrow.uturn.backward").font(.system(size: 17)) }
-                .foregroundStyle(Theme.Colors.secondaryText)
-            Button(role: .destructive) { vm.closeAllActive() } label: {
-                Image(systemName: "trash").font(.system(size: 17))
+            Button { Haptics.light(); vm.newTab() } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 26, weight: .light))
+                    .foregroundStyle(Theme.Colors.accent)
+                    .frame(maxWidth: .infinity)
+            }
+            Button { dismiss() } label: {
+                Text("完成")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.accent)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, Theme.Spacing.xl)
-        .frame(height: 50)
+        .frame(height: 54)
     }
 
     private var emptyState: some View {
@@ -82,21 +92,6 @@ struct TabsView: View {
             Text("关闭所有无痕标签后将清除本次记录").font(.system(size: 13)).foregroundStyle(Theme.Colors.secondaryText)
         }
         .padding(.top, 120)
-    }
-}
-
-private struct ModeTab: View {
-    var symbol: String, title: String, active: Bool, action: () -> Void
-    var body: some View {
-        Button(action: { Haptics.light(); action() }) {
-            HStack(spacing: 5) {
-                Image(systemName: symbol).font(.system(size: 14))
-                Text(title).font(.system(size: 14, weight: active ? .semibold : .regular))
-            }
-            .foregroundStyle(active ? Theme.Colors.accent : Theme.Colors.secondaryText)
-            .padding(.horizontal, 14).padding(.vertical, 6)
-            .background(active ? Theme.Colors.accent.opacity(0.12) : .clear, in: Capsule())
-        }
     }
 }
 

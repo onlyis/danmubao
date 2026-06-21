@@ -166,6 +166,20 @@ private struct MenuCell: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(isOn ? Theme.Colors.accent : Theme.Colors.groupedBackground)
                     )
+                    .overlay(alignment: .bottomTrailing) {
+                        // 开关型功能：在图标右下角画一个迷你开关，直观显示状态
+                        if item.isToggle {
+                            Capsule()
+                                .fill(isOn ? Theme.Colors.safe : Color.gray.opacity(0.45))
+                                .frame(width: 22, height: 13)
+                                .overlay(
+                                    Circle().fill(.white).frame(width: 10, height: 10)
+                                        .offset(x: isOn ? 4.5 : -4.5)
+                                )
+                                .overlay(Capsule().strokeBorder(Theme.Colors.card, lineWidth: 1.5))
+                                .offset(x: 5, y: 5)
+                        }
+                    }
                 Text(item.title)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Colors.secondaryText)
