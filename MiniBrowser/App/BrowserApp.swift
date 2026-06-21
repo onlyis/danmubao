@@ -12,6 +12,7 @@ struct BrowserApp: App {
                 .environmentObject(vm.library)
                 .environmentObject(vm.toasts)
                 .environmentObject(UserScriptStore.shared)
+                .environmentObject(PluginStore.shared)
                 .environmentObject(downloads)
                 .tint(Theme.Colors.accent)
         }

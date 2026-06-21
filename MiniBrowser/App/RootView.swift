@@ -115,6 +115,7 @@ struct RootView: View {
         case .devtools:     DevToolsView()
         case .cookies:      CookieManagerView()
         case .gestures:     GestureSettingsView()
+        case .plugins:      PluginMarketView()
         }
     }
 }

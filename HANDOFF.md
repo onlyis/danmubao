@@ -151,6 +151,7 @@ MiniBrowser/
 | JS 扩展（用户脚本真实注入，匹配 glob + 时机） | ✅ 真实 | `Models/UserScriptStore.swift`, `Browser/WebEngine.swift`, `Tools/FeatureViews.swift` |
 | 书签文件夹（层级 parentID + 新建/编辑/移动/删除） | ✅ 真实 | `Models/Models.swift`, `Models/LibraryStore.swift`, `Bookmarks/BookmarksView.swift` |
 | 网页内长按链接下载（原生上下文菜单） | ✅ 真实 | `Browser/WebEngine.swift`(WKUIDelegate), `Browser/BrowserView.swift` |
+| 插件体系 + 插件市场（广告拦截=真实 WKContentRuleList 插件） | ✅ 真实 | `Models/Plugin.swift`, `Models/PluginStore.swift`, `Plugins/PluginMarketView.swift` |
 
 > 「✅ UI」= 界面与流程完整、可交互，但底层为占位/示例数据。
 
@@ -158,7 +159,7 @@ MiniBrowser/
 
 ## 5. 未完成 / 占位（明确告知用户的待办）
 
-- **被用户明确推迟的**：无图模式 / 广告拦截接 `WKContentRuleList`（用户说「后面有插件处理」，**先跳过**）。
+- **插件体系 / 插件市场**：✅ 已搭框架（`Models/Plugin.swift` 内置目录 + `Models/PluginStore.swift` 状态持久化/引擎集成 + `Features/Plugins/PluginMarketView.swift`）。两类插件：`contentRule`（编译为 `WKContentRuleList`）与 `userScript`（复用 `UserScriptStore.wrap`）。`WebEngine.init` 注入。入口：设置 → 功能 → 插件市场（已取代原「广告拦截」单独入口）。**广告拦截现为插件**（`adblock.basic`，真实 `WKContentRuleList`，默认安装启用）。注意：① 规则编译是**异步**的，仅对之后新建标签生效；② WKContentRuleList 仅支持受限正则子集（交替组等会编译失败），失败只记录并跳过、不崩溃；③ 目录在代码内，仅安装/启用状态持久化到 `plugins.json`。后续可扩展：把更多内置功能收编为插件、接远程目录。
 - **iCloud 同步**：✅ 书签/历史已用 `NSUbiquitousKeyValueStore` 真实同步（`Models/CloudSync.swift` + `LibraryStore.persist/applyRemote`，含防回写守卫与 last-writer-wins）。entitlement 由 `project.yml` 生成（`MiniBrowser/Resources/MiniBrowser.entitlements`，已 gitignore）。**真机需在 Signing & Capabilities 勾选 iCloud → Key-value storage**；模拟器/未登录 iCloud 时静默降级不影响本地。规则/插件同步仍是占位。
 - **JS 扩展**：✅ 已真实注入（`Models/UserScriptStore.swift` + `WebEngine` 在 init 写入 `WKUserContentController`，按 match glob 包网址守卫）。编辑界面接真实存储。限制：编辑只对**之后新建的标签**生效（已创建引擎不热更新）。
 - **翻译**：UI 完整，未接真实翻译 API。**待决策**：选定翻译服务 + API Key，或用 iOS 17.4+ 系统 `TranslationSession`（部署目标 17.0，需 `@available` 降级）。
@@ -185,8 +186,9 @@ MiniBrowser/
 5. ✅ **网页内长按下载**（`WebEngine` 的 `WKUIDelegate` 上下文菜单）。
 6. ✅ **iCloud 同步**（书签/历史，`NSUbiquitousKeyValueStore`）。
 7. **翻译接 API**：选定服务 + Key，或 iOS 17.4+ 系统 `TranslationSession`——**用户已暂缓**。
-8. **rar/7z 解压**（需第三方库，确认是否允许依赖）。
-9. **被推迟的 WKContentRuleList**（无图/广告拦截）——等「插件」方案确定后做。
+8. ✅ **插件体系 + 插件市场**（广告拦截已做成真实 `WKContentRuleList` 插件）。
+9. **rar/7z 解压**（需第三方库，确认是否允许依赖）。
+10. **插件体系扩展**：把夜间/无图/划词等更多功能收编为插件；接远程插件目录（需 URL）。
 
 ---
 

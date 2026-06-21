@@ -27,7 +27,7 @@ struct SettingsView: View {
             }
 
             Section("功能") {
-                nav("广告拦截", "shield.lefthalf.filled", Theme.Colors.safe) { AdBlockView() }
+                nav("插件市场", "puzzlepiece.extension.fill", Theme.Colors.safe) { PluginMarketView() }
                 nav("网页翻译", "character.bubble", Color(hex: 0x0A84FF)) { TranslateView() }
                 nav("视频播放", "play.rectangle", Color(hex: 0xFF375F)) { PlaceholderSettings(title: "视频播放") }
                 nav("文件管理", "folder", Color(hex: 0x5AC8FA)) { PlaceholderSettings(title: "文件管理") }

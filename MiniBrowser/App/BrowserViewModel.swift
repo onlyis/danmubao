@@ -42,7 +42,7 @@ final class BrowserViewModel: ObservableObject {
     enum Route: Identifiable {
         case bookmarks, history, downloads, files, settings
         case reading, imageViewer, comic, toolbox, qrScanner, reader, translate
-        case adblock, jsExtensions, devtools, cookies, gestures
+        case adblock, jsExtensions, devtools, cookies, gestures, plugins
         var id: String { String(describing: self) }
     }
     @Published var route: Route?

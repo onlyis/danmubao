@@ -24,9 +24,11 @@ final class WebEngine: NSObject, ObservableObject {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
-        // 注入已启用的用户脚本（必须在创建 webView 前写入 userContentController）
+        // 注入用户脚本 + 插件（必须在创建 webView 前写入 userContentController）
         let controller = WKUserContentController()
         UserScriptStore.shared.installable().forEach(controller.addUserScript)
+        PluginStore.shared.installableUserScripts().forEach(controller.addUserScript)
+        PluginStore.shared.compiledRuleLists.forEach(controller.add)   // 广告拦截等内容规则
         config.userContentController = controller
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()

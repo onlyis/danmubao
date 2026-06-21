@@ -41,7 +41,8 @@ final class UserScriptStore: ObservableObject {
 
     // MARK: - 注入包装
     /// 用 `location.href` 对 match 做正则守卫；脚本自身异常被捕获，不影响页面与其它脚本。
-    private static func wrap(code: String, match: String) -> String {
+    /// 供 PluginStore 复用（用户脚本类插件共用同一注入包装）。
+    static func wrap(code: String, match: String) -> String {
         let pattern = jsStringLiteral(globToRegex(match))
         return """
         (function(){try{if(!(new RegExp(\(pattern))).test(location.href))return;
