@@ -375,9 +375,9 @@ struct AboutView: View {
                 .listRowBackground(Color.clear)
             }
             Section {
-                NavigationLink("更新日志", destination: PlaceholderSettings(title: "更新日志"))
-                NavigationLink("隐私政策", destination: PlaceholderSettings(title: "隐私政策"))
-                NavigationLink("用户协议", destination: PlaceholderSettings(title: "用户协议"))
+                NavigationLink("更新日志", destination: ChangelogView())
+                NavigationLink("隐私政策", destination: PrivacyPolicyView())
+                NavigationLink("用户协议", destination: UserAgreementView())
             }
             Section("联系我们") {
                 LabeledContent("邮箱", value: "support@example.com")

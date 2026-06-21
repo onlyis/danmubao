@@ -43,6 +43,9 @@ struct WebsiteSettingsSheet: View {
                     }
                     Toggle(isOn: $clipboard) { rowLabel("允许访问剪贴板", "doc.on.clipboard") }
                     Toggle(isOn: $newTabLinks) { rowLabel("新标签页打开链接", "plus.square.on.square") }
+                    Toggle(isOn: Binding(get: { vm.blockRedirects }, set: { _ in vm.toggleBlockRedirects() })) {
+                        rowLabel("拦截跳转", "hand.raised")
+                    }
                 }
 
                 Section {
@@ -58,8 +61,7 @@ struct WebsiteSettingsSheet: View {
                 Section {
                     Button { vm.clearSiteAdRules() } label: { rowLabel("清除本站广告规则", "trash", tint: Theme.Colors.danger) }
                     Button { vm.clearSiteCookies() } label: { rowLabel("清除本站 Cookie", "trash", tint: Theme.Colors.danger) }
-                    // WKWebView 不暴露证书链，无法呈现真实证书详情，保留占位并提示。
-                    Button { vm.showToast("系统未提供证书查看能力", symbol: "lock.shield") } label: {
+                    Button { dismiss(); vm.viewCertificate() } label: {
                         rowLabel("查看站点证书", "lock.shield", tint: Theme.Colors.accent)
                     }
                     Button {

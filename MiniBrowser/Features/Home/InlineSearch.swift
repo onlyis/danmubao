@@ -134,8 +134,12 @@ struct SearchSuggestionList: View {
     private let base = ["天行九歌", "github trending", "swiftui 教程", "天气预报"]
 
     private var hasClipURL: Bool { UIPasteboard.general.hasURLs }
+    /// 建议来源：query 为空显示本地热词；非空优先用真实联想词（vm.searchSuggestions）。
     private var suggestions: [String] {
-        query.isEmpty ? base : base.filter { $0.localizedCaseInsensitiveContains(query) } + [query]
+        guard !query.isEmpty else { return base }
+        var list = vm.searchSuggestions
+        if !list.contains(where: { $0.caseInsensitiveCompare(query) == .orderedSame }) { list.append(query) }
+        return list
     }
     private var historyItems: [HistoryItem] {
         var seen = Set<String>()
@@ -175,6 +179,7 @@ struct SearchSuggestionList: View {
             .padding(.vertical, 8)
         }
         .scrollDismissesKeyboard(.interactively)
+        .onChange(of: query) { _, newValue in vm.fetchSuggestions(newValue) }
     }
 
     // MARK: - 组件

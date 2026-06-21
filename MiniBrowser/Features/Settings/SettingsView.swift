@@ -47,7 +47,7 @@ struct SettingsView: View {
 
             Section("隐私与安全") {
                 toggleRow("无痕浏览", "eyeglasses", Theme.Colors.incognito, $vm.isIncognito)
-                toggleRow("Face ID 验证", "faceid", Color(hex: 0x34C759), .constant(false))
+                nav("应用锁", "faceid", Color(hex: 0x34C759)) { AppLockSettingsView() }
                 nav("清除浏览数据", "trash", Theme.Colors.danger) { ClearDataView() }
                 toggleRow("阻止跳转 App Store", "app.badge", Color(hex: 0xFF9500), .constant(true))
                 nav("Cookie 管理", "circle.grid.cross", Color(hex: 0x5AC8FA)) { CookieManagerView() }

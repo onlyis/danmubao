@@ -14,6 +14,8 @@ struct FilesView: View {
     @State private var moveTarget: FileItem?
     @State private var newFolderPrompt = false
     @State private var newFolderName = ""
+    @State private var showDocImporter = false
+    @State private var showPhotoImporter = false
 
     private let categoryColumns = [GridItem(.flexible()), GridItem(.flexible())]
     private let gridColumns = [GridItem(.adaptive(minimum: 96), spacing: Theme.Spacing.m)]
@@ -67,8 +69,8 @@ struct FilesView: View {
 
             Section {
                 Button { } label: { Label("Wi-Fi 传输", systemImage: "wifi") }
-                Button { } label: { Label("从相册导入", systemImage: "photo") }
-                Button { } label: { Label("从系统文件导入", systemImage: "folder.badge.plus") }
+                Button { showPhotoImporter = true } label: { Label("从相册导入", systemImage: "photo") }
+                Button { showDocImporter = true } label: { Label("从系统文件导入", systemImage: "folder.badge.plus") }
             }
         }
         .listStyle(.insetGrouped)
@@ -95,6 +97,20 @@ struct FilesView: View {
                 performMove(file, to: folder)
             }
             .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showDocImporter) {
+            DocumentImportPicker { count in
+                showDocImporter = false
+                if count > 0 { reload(); vm.showToast("已导入 \(count) 个文件") }
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showPhotoImporter) {
+            PhotoImportPicker { count in
+                showPhotoImporter = false
+                if count > 0 { reload(); vm.showToast("已导入 \(count) 个文件") }
+            }
+            .ignoresSafeArea()
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { Button("完成") { dismiss() } }

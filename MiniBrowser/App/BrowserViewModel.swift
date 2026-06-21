@@ -283,8 +283,13 @@ final class BrowserViewModel: ObservableObject {
         if let ne = DiskStore.load([String].self, from: "nav_expanded.json") { navExpanded = Set(ne) }
         if let ql = DiskStore.load([QuickLink].self, from: "quicklinks.json") { quickLinks = ql }
         if let n = DiskStore.load(Bool.self, from: "night.json") { isNightMode = n }
+        if let b = DiskStore.load(Bool.self, from: "block_redirects.json") { blockRedirects = b }
         if let m = DiskStore.load([[String]].self, from: "menu.json"), !m.isEmpty { menuItems = m }
         if let pn = DiskStore.load([String].self, from: "panel.json") { panelItems = pn }
+        if let snd = DiskStore.load(Bool.self, from: "show_nav_directory.json") { showNavDirectory = snd }
+        if let nth = DiskStore.load(Bool.self, from: "new_tab_opens_homepage.json") { newTabOpensHomepage = nth }
+        if let hu = DiskStore.load(String.self, from: "homepage_url.json") { homepageURL = hu }
+        if let dvr = DiskStore.load(Double.self, from: "default_video_rate.json") { defaultVideoRate = dvr }
         // 不变式校正：gesture ∈ toolbarItems ⟺ 放置方式为工具栏（防旧数据不一致导致空槽）
         let gestureInToolbar = toolbarItems.contains(.gesture)
         if (gesture.placement == .toolbar) != gestureInToolbar {
@@ -488,6 +493,10 @@ case "识别图中码": qrAutoPickPhoto = true; route = .qrScanner
         case "无图模式": toggleNoImage(); return false
         case "广告拦截": toggleAdBlock(); return false
         case "电脑版", "桌面版网站": isDesktopMode.toggle(); return false
+        // 拦截跳转（开关型，停留不关弹层）
+        case "拦截跳转": toggleBlockRedirects(); return false
+        // 查看站点证书（动作型，关闭宿主弹层后弹证书 sheet）
+        case "查看证书", "查看站点证书": viewCertificate()
         default:
             showToast("「\(title)」暂未实现", symbol: "hammer")
             return false
@@ -774,6 +783,141 @@ func resetSitePermissions() {
         } catch { showToast("压缩失败：\(error.localizedDescription)", symbol: "exclamationmark.triangle.fill"); return false }
     }
 
+// MARK: - 标记广告（点选元素 → 隐藏并按站持久化）
+// 依赖：AdHideStore.shared（新文件）、engine.beginElementPick/cancelElementPick/applyAdHide（WebEngine 新方法）。
+
+/// 进入元素拾取态：注入拾取层，开始隐藏选中的元素；每隐藏一个回调一次（带选择器）。
+/// 选中即写入 AdHideStore（按当前 host 持久化）并立即注入隐藏 CSS。
+func beginAdElementPick(onPick: @escaping (String) -> Void) {
+    guard isBrowsing, let engine else {
+        showToast("请先打开网页", symbol: "exclamationmark.circle")
+        showMarkAds = false
+        return
+    }
+    let host = engine.webView.url?.host
+    engine.beginElementPick { [weak self, weak engine] selector in
+        guard let self, let engine else { return }
+        // 持久化该站规则并取回完整列表，立即整体注入隐藏 CSS。
+        let all = AdHideStore.shared.add(selector, for: host)
+        engine.applyAdHide(all)
+        onPick(selector)
+    }
+}
+
+/// 退出拾取态：移除拾取层监听（已隐藏的元素保持隐藏）。
+func endAdElementPick() {
+    engine?.cancelElementPick()
+}
+
+/// 撤销某条隐藏规则（按站移除并重注入剩余规则）。
+func undoAdHide(selector: String) {
+    guard let engine else { return }
+    let host = engine.webView.url?.host
+    let all = AdHideStore.shared.remove(selector, for: host)
+    engine.applyAdHide(all)
+}
+// 在 @Published var oledBlack / wallpaper 等外观/偏好区域附近新增以下 4 个持久化偏好开关（didSet 落盘，init 末尾恢复）：
+
+/// 主页第二屏「网址导航目录」是否显示（默认显示）。真实生效：HomeView 据此条件渲染第二页。
+@Published var showNavDirectory: Bool = true { didSet { DiskStore.save(showNavDirectory, to: "show_nav_directory.json") } }
+/// 新建标签页时是否直接打开主页地址（偏好，持久化）。
+@Published var newTabOpensHomepage: Bool = false { didSet { DiskStore.save(newTabOpensHomepage, to: "new_tab_opens_homepage.json") } }
+/// 主页地址（偏好，持久化，默认百度）。
+@Published var homepageURL: String = "baidu.com" { didSet { DiskStore.save(homepageURL, to: "homepage_url.json") } }
+/// 默认视频播放倍速（偏好，持久化，默认 1.0 倍速）。
+@Published var defaultVideoRate: Double = 1.0 { didSet { DiskStore.save(defaultVideoRate, to: "default_video_rate.json") } }
+// 加在 BrowserViewModel 弹出层标志区附近（与 showWebsiteSettings 等并列）：
+
+    /// 拦截跨域自动跳转（页面级开关，按引擎生效，切标签时由 bindActiveEngine 同步）。持久化。
+    @Published var blockRedirects: Bool = false { didSet { DiskStore.save(blockRedirects, to: "block_redirects.json") } }
+    /// 证书详情 sheet 控制：非 nil 时呈现 CertificateView。
+    @Published var certificateInfo: CertificateInfo?
+
+    /// 切换「拦截跳转」并同步进当前引擎；停留弹层（开关型）。
+    func toggleBlockRedirects() {
+        blockRedirects.toggle()
+        engine?.blockRedirects = blockRedirects
+        showToast(blockRedirects ? "已开启拦截跳转" : "已关闭拦截跳转", symbol: blockRedirects ? "hand.raised.fill" : "hand.raised.slash")
+    }
+
+    /// 查看当前站点证书：从引擎缓存的 SecTrust 解析证书信息并弹出详情。
+    func viewCertificate() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        guard let info = engine.certificateInfo(host: currentHost) else {
+            showToast("未获取到证书信息", symbol: "lock.shield"); return
+        }
+        certificateInfo = info
+    }
+
+// 注意: 需在 bindActiveEngine(_:) 内补充两行（见 sharedFileEdits 对 BrowserViewModel.swift 的替换），
+// 用于把 blockRedirects 同步进新激活引擎 + 绑定被拦截回调提示。
+// 还需在 init 末尾恢复持久化（见 sharedFileEdits）。
+// MARK: - 搜索联想词（真实接口）
+// 放在 searchHistory 相关代码附近即可。
+
+/// 搜索联想词建议（来自 Bing osjson 接口，随输入实时更新；空输入时为空）
+@Published var searchSuggestions: [String] = []
+
+/// 当前联想词请求任务（用于防抖与取消旧请求）
+private var suggestTask: Task<Void, Never>?
+
+/// 拉取联想词：防抖 + 取消旧请求；空 query 立即清空；
+/// 用 Bing osjson 接口（HTTPS，免 Key），解析 JSON 数组第二元素 [词,[建议...]]，回主线程赋值。
+func fetchSuggestions(_ q: String) {
+    let keyword = q.trimmingCharacters(in: .whitespaces)
+    // 取消上一个未完成的请求，避免乱序覆盖。
+    suggestTask?.cancel()
+    // 空输入直接清空，无需发请求。
+    guard !keyword.isEmpty else {
+        searchSuggestions = []
+        return
+    }
+    // 网址/含协议或斜杠的输入不做联想（用户在敲地址）。
+    if keyword.contains("://") || keyword.contains(" ") == false && keyword.contains(".") && !keyword.contains("。") {
+        // 仅对疑似域名输入跳过联想；普通关键词照常联想。
+        if keyword.contains(".") && !keyword.hasSuffix(".") && URL(string: keyword.hasPrefix("http") ? keyword : "https://\(keyword)") != nil && keyword.range(of: "[\\u4e00-\\u9fa5]", options: .regularExpression) == nil {
+            searchSuggestions = []
+            return
+        }
+    }
+    suggestTask = Task { @MainActor [weak self] in
+        // 防抖：等待 220ms，期间被取消则不发请求。
+        try? await Task.sleep(nanoseconds: 220_000_000)
+        if Task.isCancelled { return }
+        guard let self else { return }
+        let results = await Self.requestBingSuggestions(keyword)
+        if Task.isCancelled { return }
+        // 回主线程赋值（本类 @MainActor，await 后已在主线程）。
+        self.searchSuggestions = results
+    }
+}
+
+/// 调用 Bing osjson 联想接口并解析结果（非主线程网络，纯静态避免捕获 self）。
+/// 返回示例 JSON: ["swift", ["swiftui","swift 教程", ...]]
+private static func requestBingSuggestions(_ keyword: String) async -> [String] {
+    guard let encoded = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+          let url = URL(string: "https://api.bing.com/osjson.aspx?query=\(encoded)") else {
+        return []
+    }
+    var request = URLRequest(url: url)
+    request.timeoutInterval = 6
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    do {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return [] }
+        // 解析 [词, [建议...]]：取第二个元素的字符串数组。
+        let json = try JSONSerialization.jsonObject(with: data)
+        guard let arr = json as? [Any], arr.count >= 2, let list = arr[1] as? [String] else { return [] }
+        return Array(list.prefix(8))
+    } catch {
+        // 网络/解析失败：静默降级为空建议（不抛错以免打断输入体验），但保留上下文供调试。
+        #if DEBUG
+        print("fetchSuggestions failed keyword=\(keyword) url=\(url) error=\(error)")
+        #endif
+        return []
+    }
+}
+
     // MARK: - 书签（委托 LibraryStore，附带 Toast 反馈）
     func addBookmark(title: String, url: String) {
         switch library.addBookmark(title: title, url: url) {
@@ -832,6 +976,12 @@ func resetSitePermissions() {
         // 保证「夜间/桌面同步 + 各回调」一定绑到将要显示的这个引擎上（不会因尚未创建而漏绑）。
         let engine = tab.engine
         engine.syncPageState(night: isNightMode, desktop: isDesktopMode)
+        engine.blockRedirects = blockRedirects   // 同步「拦截跳转」开关到该引擎
+        engine.onBlockedRedirect = { [weak self] url in
+            self?.showToast("已拦截跳转：\(url.host ?? url.absoluteString)", symbol: "hand.raised.fill")
+        }
+        // 应用本站已保存的广告隐藏规则（按 host 归一化匹配），随引擎激活生效。
+        engine.applyAdHide(AdHideStore.shared.selectors(for: engine.webView.url?.host))
         refreshVideoPresence(for: tab)   // 切到/加载该标签时检测是否有视频
         engine.onDidFinish = { [weak self, weak tab] in
             guard let self, let tab else { return }

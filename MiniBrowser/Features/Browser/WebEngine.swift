@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import Security
 
 /// 真实网页引擎：封装 WKWebView，向 UI 暴露标题、进度、前进/后退等状态。
 @MainActor
@@ -24,6 +25,16 @@ final class WebEngine: NSObject, ObservableObject {
     /// 切换标签时由 `syncPageState` 把全局开关同步进来，避免新引擎与全局开关脱节。
     private(set) var nightMode = false
     private(set) var desktopMode = false
+
+    /// 拦截跨域自动跳转（.other 导航类型的自动重定向）。由 VM 的全局开关同步进来。
+    @Published var blockRedirects = false
+    /// 当前主文档 host：用于判断后续自动跳转是否跨域。didCommit 时更新。
+    private var mainDocumentHost = ""
+    /// 拦截到跳转时回调（携带被拦截的目标 URL），由视图层接到 Toast 提示。
+    var onBlockedRedirect: ((URL) -> Void)?
+    /// 最近一次 TLS 握手缓存的服务器信任对象（用于解析站点证书）。
+    /// WKWebView 不直接暴露证书链，故在 `didReceive challenge` 缓存 SecTrust。
+    private var latestServerTrust: SecTrust?
 
     /// 长按链接时通过原生上下文菜单请求下载（由视图层接到 DownloadManager）。
     var onRequestDownload: ((URL) -> Void)?
@@ -414,6 +425,166 @@ func clearSiteData(host: String, completion: @escaping () -> Void) {
         webView.evaluateJavaScript(js) { r, _ in completion(r as? String) }
     }
 
+// MARK: - 标记广告：元素拾取 + 按站隐藏 CSS 注入
+// 持有当前已隐藏选择器，didFinish（导航/重载后）按本站重注入，做到持续生效且不依赖外部传 host。
+// 注：以下属性与方法均加在 WebEngine 类体内（@MainActor）。
+
+/// 本站当前生效的隐藏选择器（applyAdHide 时记下）。didFinish 后非空则重注入。
+private(set) var adHideSelectors: [String] = []
+
+/// 元素拾取轮询定时器与回调（取回选择器即回调上层去持久化+隐藏）。
+private var elementPickTimer: Timer?
+private var onElementPicked: ((String) -> Void)?
+
+/// 进入元素拾取态：注入一个置顶高亮层，跟随触摸高亮命中元素、点触确认时把其 CSS 选择器写入
+/// window.__mb_pick_selector；Swift 端用 Timer 轮询取回（WKWebView 无法直接同步回传，故走轮询范式）。
+func beginElementPick(onPick: @escaping (String) -> Void) {
+    onElementPicked = onPick
+    let js = """
+    (function(){
+      if (window.__mb_pickActive) { return; }
+      window.__mb_pickActive = true;
+      window.__mb_pick_selector = '';
+      // 计算一个尽量唯一且稳定的 CSS 选择器：优先 #id，否则用「tag.class:nth-of-type」逐级上溯（最多 4 级）。
+      function cssPath(el){
+        if (!el || el.nodeType !== 1) return '';
+        if (el.id) { return '#' + CSS.escape(el.id); }
+        var parts = [];
+        var node = el, depth = 0;
+        while (node && node.nodeType === 1 && node !== document.body && depth < 4){
+          var seg = node.tagName.toLowerCase();
+          var cls = (node.className && typeof node.className === 'string')
+            ? node.className.trim().split(/\\s+/).filter(Boolean).slice(0,2) : [];
+          for (var i=0;i<cls.length;i++){ seg += '.' + CSS.escape(cls[i]); }
+          var p = node.parentNode;
+          if (p){
+            var same = [], k;
+            for (k=0;k<p.children.length;k++){ if (p.children[k].tagName === node.tagName) same.push(p.children[k]); }
+            if (same.length > 1){ seg += ':nth-of-type(' + (Array.prototype.indexOf.call(p.children, node)+1) + ')'; }
+          }
+          parts.unshift(seg);
+          if (node.id){ parts[0] = '#' + CSS.escape(node.id); break; }
+          node = node.parentNode; depth++;
+        }
+        return parts.join(' > ');
+      }
+      // 高亮浮层。
+      var hi = document.createElement('div');
+      hi.id = '__mb_pick_highlight';
+      hi.style.cssText = 'position:fixed;z-index:2147483646;pointer-events:none;border:2px solid #FF3B30;background:rgba(255,59,48,0.18);box-sizing:border-box;border-radius:4px;display:none;left:0;top:0;';
+      document.documentElement.appendChild(hi);
+      function topElementAt(x,y){
+        hi.style.display='none';
+        var el = document.elementFromPoint(x,y);
+        hi.style.display='block';
+        return el;
+      }
+      function moveTo(el){
+        if (!el || el === hi){ hi.style.display='none'; return; }
+        var r = el.getBoundingClientRect();
+        hi.style.display='block';
+        hi.style.left = r.left + 'px'; hi.style.top = r.top + 'px';
+        hi.style.width = r.width + 'px'; hi.style.height = r.height + 'px';
+      }
+      function onMove(e){
+        var t = (e.touches && e.touches[0]) ? e.touches[0] : e;
+        moveTo(topElementAt(t.clientX, t.clientY));
+      }
+      function onPick(e){
+        var t = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : e;
+        var el = topElementAt(t.clientX, t.clientY);
+        if (el && el !== hi){
+          var sel = cssPath(el);
+          if (sel){ window.__mb_pick_selector = sel; }
+        }
+        e.preventDefault(); e.stopPropagation();
+      }
+      window.__mb_pick_handlers = { onMove: onMove, onPick: onPick, hi: hi };
+      document.addEventListener('mousemove', onMove, true);
+      document.addEventListener('touchmove', onMove, true);
+      document.addEventListener('click', onPick, true);
+      document.addEventListener('touchend', onPick, true);
+    })();
+    """
+    webView.evaluateJavaScript(js)
+    // 轮询取回选中的选择器（每 0.2s 一次）；取到后清空 JS 侧标记，回调上层。
+    elementPickTimer?.invalidate()
+    elementPickTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+        guard let self else { return }
+        self.webView.evaluateJavaScript("(function(){var s=window.__mb_pick_selector||'';window.__mb_pick_selector='';return s;})();") { result, _ in
+            guard let sel = result as? String, !sel.isEmpty else { return }
+            self.onElementPicked?(sel)
+        }
+    }
+}
+
+/// 退出元素拾取态：停止轮询、移除监听层与高亮浮层（已隐藏的元素保持隐藏）。
+func cancelElementPick() {
+    elementPickTimer?.invalidate()
+    elementPickTimer = nil
+    onElementPicked = nil
+    let js = """
+    (function(){
+      var h = window.__mb_pick_handlers;
+      if (h){
+        document.removeEventListener('mousemove', h.onMove, true);
+        document.removeEventListener('touchmove', h.onMove, true);
+        document.removeEventListener('click', h.onPick, true);
+        document.removeEventListener('touchend', h.onPick, true);
+        if (h.hi && h.hi.parentNode){ h.hi.parentNode.removeChild(h.hi); }
+      }
+      window.__mb_pickActive = false;
+      window.__mb_pick_handlers = null;
+      window.__mb_pick_selector = '';
+    })();
+    """
+    webView.evaluateJavaScript(js)
+}
+
+/// 注入/更新本站隐藏 CSS（id=__mb_adhide 的 <style>，display:none!important）。
+/// 空列表则移除该 style。记下 selectors 供 didFinish 后重注入。
+func applyAdHide(_ selectors: [String]) {
+    adHideSelectors = selectors
+    injectAdHideCSS()
+}
+
+/// 按 adHideSelectors 注入或移除隐藏样式（导航后 document 丢失，需重注入）。
+private func injectAdHideCSS() {
+    guard !adHideSelectors.isEmpty else {
+        webView.evaluateJavaScript("var s=document.getElementById('__mb_adhide');if(s)s.remove();")
+        return
+    }
+    // 把选择器拼成一条 CSS 规则；选择器内含的反斜杠/引号经 JSON 编码转义后安全嵌入 JS 字符串。
+    let rule = adHideSelectors.joined(separator: ",") + "{display:none!important}"
+    let literal: String = {
+        guard let data = try? JSONEncoder().encode(rule) else { return "\"\"" }
+        return String(decoding: data, as: UTF8.self)
+    }()
+    let js = "var s=document.getElementById('__mb_adhide');if(!s){s=document.createElement('style');s.id='__mb_adhide';(document.head||document.documentElement).appendChild(s);}s.innerHTML=\(literal);"
+    webView.evaluateJavaScript(js)
+}
+
+    // MARK: - 站点证书：解析最近缓存的 SecTrust（仅用 iOS 可用 API）
+    func certificateInfo(host: String) -> CertificateInfo? {
+        guard let trust = latestServerTrust else { return nil }
+        let chain: [SecCertificate]
+        if #available(iOS 15.0, *) {
+            chain = (SecTrustCopyCertificateChain(trust) as? [SecCertificate]) ?? []
+        } else {
+            var arr: [SecCertificate] = []
+            for i in 0..<SecTrustGetCertificateCount(trust) {
+                if let c = SecTrustGetCertificateAtIndex(trust, i) { arr.append(c) }
+            }
+            chain = arr
+        }
+        guard let leaf = chain.first else { return nil }
+        let subject = (SecCertificateCopySubjectSummary(leaf) as String?) ?? "未知"
+        // iOS 不暴露 SecCertificateCopyValues：用证书链上一级主体摘要近似「颁发者」。
+        let issuer = chain.count > 1 ? ((SecCertificateCopySubjectSummary(chain[1]) as String?) ?? "未知") : "未知"
+        return CertificateInfo(host: host, subjectSummary: subject, issuerSummary: issuer,
+                               notBefore: nil, notAfter: nil, serialNumber: "", chainLength: chain.count)
+    }
+
     // MARK: - 输入归一化：网址 or 搜索关键词
     static func normalize(_ text: String, searchTemplate: String) -> URL {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
@@ -438,10 +609,37 @@ extension WebEngine: WKNavigationDelegate {
     }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         navigating = false   // 新页面首帧已就绪，撤掉加载遮罩
+        if let host = webView.url?.host, !host.isEmpty { mainDocumentHost = host }   // 记录主文档域名，供跨域跳转判断
+    }
+
+    /// 拦截跳转：开启 blockRedirects 时，取消「跨域 + .other（无用户点击）」的自动重定向。
+    /// 用户点击链接(.linkActivated)、表单提交、前进后退等正常导航不受影响。
+    func webView(_ webView: WKWebView,
+                 decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard blockRedirects, navigationAction.navigationType == .other,
+              let target = navigationAction.request.url, let targetHost = target.host,
+              !mainDocumentHost.isEmpty, targetHost != mainDocumentHost else {
+            decisionHandler(.allow); return
+        }
+        decisionHandler(.cancel)
+        onBlockedRedirect?(target)
+    }
+
+    /// 缓存服务器信任对象用于证书查看；信任决策仍交回系统默认处理（不改变安全行为）。
+    func webView(_ webView: WKWebView,
+                 didReceive challenge: URLAuthenticationChallenge,
+                 completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let trust = challenge.protectionSpace.serverTrust {
+            latestServerTrust = trust
+        }
+        completionHandler(.performDefaultHandling, nil)
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         isLoading = false; navigating = false
         if nightMode { injectNightCSS() }   // 导航后 document 丢失反色样式，重注入以保持夜间
+        if !adHideSelectors.isEmpty { injectAdHideCSS() }   // 导航后按本站重注入广告隐藏 CSS，持续生效
         onDidFinish?()
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

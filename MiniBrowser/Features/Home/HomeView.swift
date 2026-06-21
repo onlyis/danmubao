@@ -19,7 +19,10 @@ struct HomeView: View {
 
             TabView(selection: $homePage) {
                 quickLinksPage.tag(0)
-                NavDirectoryView(lightText: lightText).tag(1)
+                // 第二屏「网址导航目录」：由设置开关控制是否显示（默认显示）。
+                if vm.showNavDirectory {
+                    NavDirectoryView(lightText: lightText).tag(1)
+                }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
             .indexViewStyle(.page(backgroundDisplayMode: .interactive))

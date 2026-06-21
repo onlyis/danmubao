@@ -190,6 +190,16 @@ MiniBrowser/
 
 ## 5. 未完成 / 占位（明确告知用户的待办）
 
+> **2026-06-22 第三批 workflow（6 agent, 严格引用闭合, 已构建+启动验证, 含 sharedFileEdits 精确替换机制）**：
+> - **标记广告真实化**（补回上批）: 点选页面元素→计算 CSS 选择器→按 host 持久化 `AdHideStore`(adhide.json)→注入 `#__mb_adhide` 隐藏 CSS, didFinish/切标签重注入持续生效。`WebEngine.beginElementPick/cancelElementPick/applyAdHide`、`MarkAdsOverlay` 重写、`vm.beginAdElementPick` 等。
+> - **文件导入**: 从系统文件(`UIDocumentPicker`)/相册(`PHPicker`)导入到下载目录(`FileImport.swift`, FilesView 两按钮接真)。
+> - **设置占位真实化**: 更新日志/隐私政策/用户协议真实文本(`AboutPages.swift`) + 4 个持久化生效开关(showNavDirectory 控制主页第二屏等)。
+> - **应用锁**: Face ID/设备密码(`AppLock.swift`, LocalAuthentication, `LockGateView` 包裹 RootView, scenePhase 后台上锁)。
+> - **拦截跳转 + 站点证书**: `WebEngine.blockRedirects`(decidePolicyFor 取消跨域 .other 自动跳转) + `certificateInfo`(缓存 SecTrust→iOS 可用 API 解析主体/颁发者/链长, `CertificateView`)。菜单「拦截跳转/查看证书」接真。
+> - **搜索建议真实化**: Bing osjson 接口(免 Key)实时联想词, `vm.fetchSuggestions`(防抖/取消) + InlineSearch 接真。
+> - 坑: 证书 `SecCertificateCopyValues`/`kSecOID*` 是 macOS-only, 已改纯 iOS API。
+
+
 > **2026-06-22 第二批 workflow（2 workflow×6 agent 并行, 集成 9 个, 已构建+启动验证）**：
 > - 视频增强: 视频截图(canvas→PNG 存下载)、镜像播放(scaleX(-1))、后台播放(AVAudioSession, 新文件 BackgroundAudio.swift + project.yml UIBackgroundModes audio)。菜单「视频截图/镜像播放/后台播放」接真。
 > - AirPlay: 真实系统路由(AVRoutePickerView, 新文件 AirPlayButton.swift→AirPlaySheet, vm.showAirPlay)。菜单「AirPlay」接真。

@@ -90,6 +90,13 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
         }
+        // 站点证书详情
+        .sheet(item: $vm.certificateInfo) { info in
+            CertificateView(info: info)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(Theme.Radius.sheet)
+        }
         // 系统分享面板
         .sheet(item: $vm.shareItem) { item in
             ActivityView(items: [item.url])
