@@ -41,10 +41,10 @@ struct RootView: View {
                 }
             }
             .padding(.bottom, Theme.Size.toolbarHeight)
-            .scaleEffect(pagePop, anchor: .bottomLeading)   // 新建标签：从左下角弹出
+            .scaleEffect(pagePop, anchor: .bottomLeading)   // 新建标签：从左下角弹出（快）
             .onChange(of: vm.pagePopTrigger) { _, _ in
                 pagePop = 0.1
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.78).delay(0.12)) { pagePop = 1 }
+                withAnimation(.spring(response: 0.15, dampingFraction: 0.72)) { pagePop = 1 }
             }
 
             // 底部固定工具栏（主页态不创建引擎）
@@ -61,8 +61,11 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
         }
-        // 标签页管理
-        .fullScreenCover(isPresented: $vm.showTabs) { TabsView() }
+        // 标签页管理：用覆盖层 + 淡入淡出（就地消失，不向下缩）
+        .overlay {
+            if vm.showTabs { TabsView().transition(.opacity).zIndex(20) }
+        }
+        .animation(.easeInOut(duration: 0.18), value: vm.showTabs)
         // 网站设置面板
         .sheet(isPresented: $vm.showWebsiteSettings) {
             WebsiteSettingsSheet()
@@ -70,8 +73,18 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
         }
-        // 搜索输入态
-        .fullScreenCover(isPresented: $vm.showSearch) { SearchOverlay() }
+        // 搜索输入态：统一的内联搜索（主页/浏览态共用），覆盖层淡入
+        .overlay {
+            if vm.showSearch {
+                InlineSearchView(
+                    onSubmit: { q in vm.recordSearch(q); vm.open(url: q, title: q); vm.showSearch = false },
+                    onCancel: { vm.showSearch = false }
+                )
+                .transition(.opacity)
+                .zIndex(25)
+            }
+        }
+        .animation(.easeInOut(duration: 0.12), value: vm.showSearch)
         // 下载确认
         .sheet(isPresented: $vm.showDownloadConfirm) {
             DownloadConfirmSheet()

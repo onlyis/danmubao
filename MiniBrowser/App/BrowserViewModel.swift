@@ -408,6 +408,20 @@ final class BrowserViewModel: ObservableObject {
         else { showToast(next.displayTitle, symbol: "square.on.square") }
     }
 
+    /// 拖动重排：把 from 移到 to 之前（当前模式的标签数组内）
+    func moveTab(_ from: Tab, before to: Tab) {
+        guard from.id != to.id, from.isIncognito == to.isIncognito else { return }
+        if isIncognito { reorder(&incognitoTabs, from, to) } else { reorder(&tabs, from, to) }
+    }
+    private func reorder(_ arr: inout [Tab], _ from: Tab, _ to: Tab) {
+        guard let f = arr.firstIndex(where: { $0.id == from.id }),
+              let t = arr.firstIndex(where: { $0.id == to.id }) else { return }
+        let item = arr.remove(at: f)
+        let dest = t > f ? t - 1 : t
+        arr.insert(item, at: dest)
+        scheduleTabPersist()
+    }
+
     /// 选择某个标签
     func select(_ tab: Tab) {
         currentTabID = tab.id

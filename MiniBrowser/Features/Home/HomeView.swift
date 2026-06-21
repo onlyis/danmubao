@@ -1,39 +1,28 @@
 import SwiftUI
 
-/// 主页 / 新标签页：顶部地址栏样式搜索框 + 常用网站宫格。
-/// 点击搜索原地把搜索栏转成输入框（不弹窗），下方出现搜索引擎图标行 + 建议列表。
+/// 主页 / 新标签页：顶部搜索栏 + 双页（常用宫格 / 网址导航目录）。
+/// 点击搜索栏弹出统一的内联搜索（与浏览态共用 InlineSearchView）。
 struct HomeView: View {
     @EnvironmentObject var vm: BrowserViewModel
-    @State private var searching = false
-    @State private var query = ""
     @State private var homePage = 0
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
-
-    /// 壁纸偏好浅色文字时主页文字改白（搜索态用常规背景，不套白字）
-    private var lightText: Bool { !searching && vm.wallpaper != .none && vm.wallpaper.prefersLightText }
+    private var lightText: Bool { vm.wallpaper != .none && vm.wallpaper.prefersLightText }
 
     var body: some View {
         VStack(spacing: 0) {
-            InlineSearchBar(searching: $searching, query: $query, onWallpaper: lightText,
-                            onSubmit: submit, onCancel: exitSearch)
+            HomeSearchButton(onWallpaper: lightText)
                 .padding(.horizontal, Theme.Spacing.l)
                 .padding(.top, Theme.Spacing.s)
-                .padding(.bottom, searching ? Theme.Spacing.s : Theme.Spacing.xl)
+                .padding(.bottom, Theme.Spacing.xl)
 
-            if searching {
-                engineRow
-                SearchSuggestionList(query: query, onPick: submit)
-            } else {
-                // 双页：常用宫格 + 网址导航目录，底部页面指示点
-                TabView(selection: $homePage) {
-                    quickLinksPage.tag(0)
-                    NavDirectoryView(lightText: lightText).tag(1)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .always))
-                .indexViewStyle(.page(backgroundDisplayMode: .interactive))
-                .frame(maxHeight: .infinity)
+            TabView(selection: $homePage) {
+                quickLinksPage.tag(0)
+                NavDirectoryView(lightText: lightText).tag(1)
             }
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            .indexViewStyle(.page(backgroundDisplayMode: .interactive))
+            .frame(maxHeight: .infinity)
         }
     }
 
@@ -48,266 +37,37 @@ struct HomeView: View {
             .padding(.horizontal, Theme.Spacing.l)
             Spacer(minLength: 80)
         }
-        .scrollDismissesKeyboard(.immediately)
-    }
-
-    /// 搜索引擎图标行：点击切换默认引擎，随后输入即用该引擎搜索。
-    private var engineRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(vm.allSearchEngines) { e in
-                    let isSel = e.id == vm.searchEngine.id
-                    Button { Haptics.light(); vm.searchEngine = e } label: {
-                        VStack(spacing: 4) {
-                            SiteIcon(glyph: e.glyph, color: e.color, size: 40, corner: 11)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                        .strokeBorder(Theme.Colors.accent, lineWidth: isSel ? 2.5 : 0)
-                                )
-                            Text(e.name).font(.system(size: 10))
-                                .foregroundStyle(isSel ? Theme.Colors.accent : Theme.Colors.secondaryText)
-                                .lineLimit(1)
-                        }
-                        .frame(width: 54)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.l)
-            .padding(.vertical, Theme.Spacing.s)
-        }
-        .frame(height: 74)
-    }
-
-    private func submit(_ text: String) {
-        let t = text.trimmingCharacters(in: .whitespaces)
-        guard !t.isEmpty else { return }
-        vm.recordSearch(t)
-        vm.open(url: t, title: t)
-        exitSearch()
-    }
-    private func exitSearch() {
-        query = ""
-        withAnimation(.easeOut(duration: 0.15)) { searching = false }
     }
 }
 
-/// 顶部搜索栏：未搜索时是按钮（盾牌 + 占位 + 二维码），点击原地变为输入框。
-private struct InlineSearchBar: View {
+/// 主页顶部搜索栏（盾牌 + 占位 + 二维码），点击弹出统一搜索。
+private struct HomeSearchButton: View {
     @EnvironmentObject var vm: BrowserViewModel
-    @Binding var searching: Bool
-    @Binding var query: String
     var onWallpaper: Bool
-    var onSubmit: (String) -> Void
-    var onCancel: () -> Void
-    @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.s) {
+        Button { Haptics.light(); vm.showSearch = true } label: {
             HStack(spacing: Theme.Spacing.s) {
-                Image(systemName: searching ? "magnifyingglass" : "shield.lefthalf.filled")
-                    .font(.system(size: searching ? 16 : 18))
-                    .foregroundStyle(searching ? Theme.Colors.secondaryText
-                                     : (vm.isAdBlockOn ? Theme.Colors.safe : Theme.Colors.secondaryText))
-
-                if searching {
-                    TextField("搜索或输入网址", text: $query)
-                        .focused($focused)
-                        .font(.system(size: 16))
-                        .submitLabel(.go)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .onSubmit { onSubmit(query) }
-                        .toolbar {
-                            // 键盘上方 URL 助手栏：快捷输入常用片段
-                            ToolbarItemGroup(placement: .keyboard) {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        ForEach(["https://", "www.", ".com", ".cn", ".net", "/"], id: \.self) { frag in
-                                            Button(frag) { query += frag }
-                                                .font(.system(size: 14, weight: .medium))
-                                                .buttonStyle(.bordered)
-                                                .controlSize(.small)
-                                                .tint(Theme.Colors.secondaryText)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    if !query.isEmpty {
-                        Button { query = "" } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.Colors.tertiaryText)
-                        }
-                    }
-                } else {
-                    Text("搜索或输入网址")
-                        .font(.system(size: 16))
-                        .foregroundStyle(onWallpaper ? Color.white.opacity(0.85) : Theme.Colors.tertiaryText)
-                    Spacer()
-                    Image(systemName: "qrcode")
-                        .font(.system(size: 19))
-                        .foregroundStyle(onWallpaper ? Color.white.opacity(0.85) : Theme.Colors.secondaryText)
-                        .onTapGesture { vm.route = .qrScanner }
-                }
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 18))
+                    .foregroundStyle(vm.isAdBlockOn ? Theme.Colors.safe : Theme.Colors.secondaryText)
+                Text("搜索或输入网址")
+                    .font(.system(size: 16))
+                    .foregroundStyle(onWallpaper ? Color.white.opacity(0.85) : Theme.Colors.tertiaryText)
+                Spacer()
+                Image(systemName: "qrcode")
+                    .font(.system(size: 19))
+                    .foregroundStyle(onWallpaper ? Color.white.opacity(0.85) : Theme.Colors.secondaryText)
+                    .onTapGesture { vm.route = .qrScanner }
             }
             .padding(.horizontal, Theme.Spacing.m)
             .frame(height: Theme.Size.searchBarHeight)
             .background {
                 RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
-                    .fill(searching ? AnyShapeStyle(Theme.Colors.card)
-                          : (onWallpaper ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Theme.Colors.groupedBackground)))
-            }
-            .overlay {
-                if searching {
-                    RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
-                        .strokeBorder(Theme.Colors.accent.opacity(0.5), lineWidth: 1.5)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { if !searching { enterSearch() } }
-
-            if searching {
-                Button("取消") { focused = false; onCancel() }
-                    .font(.system(size: 16))
+                    .fill(onWallpaper ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Theme.Colors.groupedBackground))
             }
         }
-    }
-
-    private func enterSearch() {
-        Haptics.light()
-        withAnimation(.easeOut(duration: 0.15)) { searching = true }
-        // 等输入框出现后再聚焦弹键盘
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
-    }
-}
-
-/// 搜索态下方：搜索历史 chips + 剪贴板 + 历史记录(favicon+URL) + 搜索建议。
-private struct SearchSuggestionList: View {
-    @EnvironmentObject var vm: BrowserViewModel
-    let query: String
-    var onPick: (String) -> Void
-    private let base = ["天行九歌", "github trending", "swiftui 教程", "天气预报"]
-
-    /// 仅用 hasURLs 探测（不触发系统粘贴提示），真正读取放到用户点击时。
-    private var hasClipURL: Bool { UIPasteboard.general.hasURLs }
-    private var suggestions: [String] {
-        query.isEmpty ? base : base.filter { $0.localizedCaseInsensitiveContains(query) } + [query]
-    }
-    /// 浏览历史（扁平、去重 url、按 query 过滤，取前 8）
-    private var historyItems: [HistoryItem] {
-        var seen = Set<String>()
-        let all = vm.library.history.flatMap(\.items).filter { seen.insert($0.url).inserted }
-        let filtered = query.isEmpty ? all : all.filter {
-            $0.title.localizedCaseInsensitiveContains(query) || $0.url.localizedCaseInsensitiveContains(query)
-        }
-        return Array(filtered.prefix(8))
-    }
-
-    var body: some View {
-        List {
-            // 搜索历史 chips（query 为空时）
-            if query.isEmpty && !vm.searchHistory.isEmpty {
-                Section {
-                    chipsRow
-                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                }
-            }
-
-            if hasClipURL {
-                Section {
-                    Button {
-                        if let u = UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string { onPick(u) }
-                    } label: {
-                        HStack(spacing: Theme.Spacing.m) {
-                            Image(systemName: "doc.on.clipboard").foregroundStyle(Theme.Colors.accent)
-                            Text("打开剪贴板中的网址").font(.system(size: 15)).foregroundStyle(Theme.Colors.primaryText)
-                        }
-                    }
-                }
-            }
-
-            if !historyItems.isEmpty {
-                Section(query.isEmpty ? "历史记录" : "相关历史") {
-                    ForEach(historyItems) { item in
-                        Button { onPick(item.url) } label: {
-                            HStack(spacing: Theme.Spacing.m) {
-                                SiteIconSmall(glyph: item.glyph, color: item.color)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.title).font(.system(size: 15)).foregroundStyle(Theme.Colors.primaryText).lineLimit(1)
-                                    Text(item.url).font(.system(size: 12)).foregroundStyle(Theme.Colors.secondaryText).lineLimit(1)
-                                }
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-            }
-
-            Section("搜索建议") {
-                ForEach(suggestions, id: \.self) { s in
-                    Button { onPick(s) } label: {
-                        HStack(spacing: Theme.Spacing.m) {
-                            Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundStyle(Theme.Colors.tertiaryText)
-                            Text(s).font(.system(size: 15)).foregroundStyle(Theme.Colors.primaryText)
-                            Spacer()
-                        }
-                    }
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-        .scrollDismissesKeyboard(.interactively)
-    }
-
-    /// 搜索历史 chips：左侧清空按钮 + 自动换行的可点 chip（长按删单条）
-    private var chipsRow: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Button { vm.clearSearchHistory() } label: {
-                Image(systemName: "trash").font(.system(size: 15)).foregroundStyle(Theme.Colors.secondaryText)
-                    .frame(width: 28, height: 28)
-            }
-            FlowLayout(spacing: 8) {
-                ForEach(vm.searchHistory, id: \.self) { q in
-                    Button { onPick(q) } label: {
-                        Text(q).font(.system(size: 13)).foregroundStyle(Theme.Colors.primaryText)
-                            .lineLimit(1)
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(Theme.Colors.groupedBackground, in: Capsule())
-                    }
-                    .contextMenu {
-                        Button(role: .destructive) { vm.removeSearch(q) } label: { Label("删除", systemImage: "trash") }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// 简单流式布局：子视图自动换行排列。
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
-        for sv in subviews {
-            let size = sv.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth, x > 0 { x = 0; y += rowHeight + spacing; rowHeight = 0 }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-        return CGSize(width: maxWidth, height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
-        for sv in subviews {
-            let size = sv.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX, x > bounds.minX { x = bounds.minX; y += rowHeight + spacing; rowHeight = 0 }
-            sv.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
+        .buttonStyle(.plain)
     }
 }
 
