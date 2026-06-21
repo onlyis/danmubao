@@ -43,6 +43,7 @@ final class LibraryStore: ObservableObject {
         if let d = CloudSync.shared.pull("history"),
            let v = try? JSONDecoder().decode([HistorySection].self, from: d) { history = v }
         rebuildChildrenIndex()   // init 中赋值不触发 didSet，显式建一次索引
+        history = regroup(history.flatMap(\.items))   // 按真实日期重整（旧无 day 数据归「更早」）
     }
 
     /// 编码一次 → 本地落盘 + 推送 iCloud（应用远程变更时不回推）
@@ -126,33 +127,57 @@ final class LibraryStore: ObservableObject {
     }
 
     // MARK: - 历史
-    func recordHistory(title: String, url: String) {
-        guard !url.isEmpty else { return }
-        let item = HistoryItem(title: title.isEmpty ? url : title, url: url,
-                               time: Self.timeFormatter.string(from: Date()),
-                               glyph: String(url.prefix(1)).uppercased(), colorHex: 0x0A84FF)
-        // 在本地副本上一次性改完再赋值，避免多次 didSet 触发多次落盘。
-        var sections = history
-        if let idx = sections.firstIndex(where: { $0.title == "今天" }) {
-            // 同一地址重复访问/刷新只保留最新一条并置顶，防止历史膨胀与整表重复。
-            sections[idx].items.removeAll { $0.url == url }
-            sections[idx].items.insert(item, at: 0)
-            if sections[idx].items.count > Self.maxTodayItems {
-                sections[idx].items.removeLast(sections[idx].items.count - Self.maxTodayItems)
-            }
-        } else {
-            sections.insert(HistorySection(title: "今天", items: [item]), at: 0)
+    /// 日期键格式（按天分组用）。
+    private static let dayKeyFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+    }()
+    /// 全部历史的总上限（跨天累计），避免无限增长。
+    private static let maxTotalItems = 500
+
+    /// 由条目的日期键推出分组标题：今天 / 昨天 / 更早（无 day 的旧数据归「更早」）。
+    private func sectionTitle(forDay day: String?) -> String {
+        guard let day else { return "更早" }
+        let today = Self.dayKeyFormatter.string(from: Date())
+        if day == today { return "今天" }
+        if let yest = Calendar.current.date(byAdding: .day, value: -1, to: Date()),
+           day == Self.dayKeyFormatter.string(from: yest) { return "昨天" }
+        return "更早"
+    }
+    /// 把扁平有序（最近在前）的条目按真实日期重新分组，固定显示顺序 今天 > 昨天 > 更早。
+    private func regroup(_ items: [HistoryItem]) -> [HistorySection] {
+        var map: [String: [HistoryItem]] = [:]
+        for it in items { map[sectionTitle(forDay: it.day), default: []].append(it) }
+        return ["今天", "昨天", "更早"].compactMap { t in
+            map[t].map { HistorySection(title: t, items: $0) }
         }
-        history = sections
     }
 
-    /// 页面加载完成后用真实网页标题回填「今天」里该地址的历史条目（地址栏/搜索打开时先以地址占位）。
+    func recordHistory(title: String, url: String) {
+        guard !url.isEmpty else { return }
+        let today = Self.dayKeyFormatter.string(from: Date())
+        let item = HistoryItem(title: title.isEmpty ? url : title, url: url,
+                               time: Self.timeFormatter.string(from: Date()),
+                               glyph: String(url.prefix(1)).uppercased(), colorHex: 0x0A84FF, day: today)
+        // 全局去重（重访同地址 → 移到今天最前），扁平后按真实日期重新分组，单次赋值落盘。
+        var flat = history.flatMap(\.items)
+        flat.removeAll { $0.url == url }
+        flat.insert(item, at: 0)
+        // 「今天」条数上限：只裁剪今天的，保留更早分组。
+        let todayCount = flat.prefix { $0.day == today }.count
+        if todayCount > Self.maxTodayItems { flat.removeSubrange(Self.maxTodayItems..<todayCount) }
+        if flat.count > Self.maxTotalItems { flat.removeLast(flat.count - Self.maxTotalItems) }
+        history = regroup(flat)
+    }
+
+    /// 页面加载完成后用真实网页标题回填该地址的历史条目（任意分组里按 url 命中首个）。
     func updateHistoryTitle(url: String, title: String) {
-        guard !url.isEmpty, !title.isEmpty,
-              let s = history.firstIndex(where: { $0.title == "今天" }),
-              let i = history[s].items.firstIndex(where: { $0.url == url }),
-              history[s].items[i].title != title else { return }
-        history[s].items[i].title = title
+        guard !url.isEmpty, !title.isEmpty else { return }
+        for s in history.indices {
+            if let i = history[s].items.firstIndex(where: { $0.url == url }) {
+                if history[s].items[i].title != title { history[s].items[i].title = title }
+                return
+            }
+        }
     }
 
     func removeHistory(_ item: HistoryItem) {

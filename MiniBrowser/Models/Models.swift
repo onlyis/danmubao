@@ -54,6 +54,9 @@ struct HistoryItem: Identifiable, Hashable, Codable {
     var time: String
     var glyph: String
     var colorHex: UInt
+    /// 记录当日的日期键（yyyy-MM-dd），用于按真实日期分组（今天/昨天/更早）。
+    /// 可选以兼容旧持久化数据（无此字段的老条目归入「更早」）。
+    var day: String? = nil
     var color: Color { Color(hex: colorHex) }
 }
 

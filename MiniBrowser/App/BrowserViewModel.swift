@@ -1237,19 +1237,25 @@ enum SampleData {
         ]
     }()
 
-    static let history: [HistorySection] = [
-        .init(title: "今天", items: [
-            .init(title: "天行九歌 第1集 - YouTube", url: "youtube.com/watch", time: "14:32", glyph: "Y", colorHex: 0xFF0000),
-            .init(title: "百度一下，你就知道", url: "baidu.com", time: "13:10", glyph: "百", colorHex: 0x2932E1),
-            .init(title: "GitHub: Let's build", url: "github.com", time: "11:05", glyph: "G", colorHex: 0x24292E),
-        ]),
-        .init(title: "昨天", items: [
-            .init(title: "知乎 - 发现", url: "zhihu.com", time: "21:48", glyph: "知", colorHex: 0x0066FF),
-            .init(title: "哔哩哔哩 - 番剧", url: "bilibili.com", time: "20:12", glyph: "B", colorHex: 0xFB7299),
-        ]),
-        .init(title: "更早", items: [
-            .init(title: "豆瓣电影 Top250", url: "douban.com", time: "06-18", glyph: "豆", colorHex: 0x2D963D),
-        ]),
-    ]
+    static let history: [HistorySection] = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let today = f.string(from: Date())
+        let yest = f.string(from: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date())
+        let old = f.string(from: Calendar.current.date(byAdding: .day, value: -5, to: Date()) ?? Date())
+        return [
+            .init(title: "今天", items: [
+                .init(title: "天行九歌 第1集 - YouTube", url: "youtube.com/watch", time: "14:32", glyph: "Y", colorHex: 0xFF0000, day: today),
+                .init(title: "百度一下，你就知道", url: "baidu.com", time: "13:10", glyph: "百", colorHex: 0x2932E1, day: today),
+                .init(title: "GitHub: Let's build", url: "github.com", time: "11:05", glyph: "G", colorHex: 0x24292E, day: today),
+            ]),
+            .init(title: "昨天", items: [
+                .init(title: "知乎 - 发现", url: "zhihu.com", time: "21:48", glyph: "知", colorHex: 0x0066FF, day: yest),
+                .init(title: "哔哩哔哩 - 番剧", url: "bilibili.com", time: "20:12", glyph: "B", colorHex: 0xFB7299, day: yest),
+            ]),
+            .init(title: "更早", items: [
+                .init(title: "豆瓣电影 Top250", url: "douban.com", time: "06-18", glyph: "豆", colorHex: 0x2D963D, day: old),
+            ]),
+        ]
+    }()
 
 }
