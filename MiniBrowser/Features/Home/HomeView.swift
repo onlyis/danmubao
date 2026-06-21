@@ -154,8 +154,14 @@ private struct InlineSearchBar: View {
             .frame(height: Theme.Size.searchBarHeight)
             .background {
                 RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
-                    .fill(onWallpaper && !searching ? AnyShapeStyle(.ultraThinMaterial)
-                          : AnyShapeStyle(Theme.Colors.groupedBackground))
+                    .fill(searching ? AnyShapeStyle(Theme.Colors.card)
+                          : (onWallpaper ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Theme.Colors.groupedBackground)))
+            }
+            .overlay {
+                if searching {
+                    RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                        .strokeBorder(Theme.Colors.accent.opacity(0.5), lineWidth: 1.5)
+                }
             }
             .contentShape(Rectangle())
             .onTapGesture { if !searching { enterSearch() } }

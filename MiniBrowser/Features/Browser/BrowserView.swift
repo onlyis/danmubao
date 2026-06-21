@@ -79,16 +79,6 @@ private struct BrowserContent: View {
         .padding(.horizontal, Theme.Spacing.l)
         .frame(height: 44)
         .background(Theme.Colors.card)
-        .contentShape(Rectangle())
-        // 地址栏横向滑动切换标签
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 24)
-                .onEnded { v in
-                    guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                    if v.translation.width < -36 { Haptics.soft(); vm.switchTab(by: 1) }
-                    else if v.translation.width > 36 { Haptics.soft(); vm.switchTab(by: -1) }
-                }
-        )
     }
 
     private var titleText: String {

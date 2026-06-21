@@ -70,16 +70,6 @@ struct BottomToolbar: View {
         }
         .frame(height: Theme.Size.toolbarHeight)
         .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-        // 在工具栏上横向滑动切换标签（左滑下一个 / 右滑上一个）
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 24)
-                .onEnded { v in
-                    guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                    if v.translation.width < -36 { Haptics.soft(); vm.switchTab(by: 1) }
-                    else if v.translation.width > 36 { Haptics.soft(); vm.switchTab(by: -1) }
-                }
-        )
         .background(
             (vm.isIncognito ? Color(hex: 0x111114) : Theme.Colors.card)
                 .overlay(alignment: .top) { Hairline() }

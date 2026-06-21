@@ -163,6 +163,9 @@ final class BrowserViewModel: ObservableObject {
     /// 看图模式：当前页面提取出的图片地址
     @Published var pageImages: [String] = []
 
+    /// 新建标签时自增，触发主体页面从左下角弹出的动画（RootView 观察）
+    @Published private(set) var pagePopTrigger = 0
+
     /// 查看源码弹层
     struct SourcePreview: Identifiable { let id = UUID(); let code: String }
     @Published var sourcePreview: SourcePreview?
@@ -436,7 +439,7 @@ final class BrowserViewModel: ObservableObject {
         if isIncognito { incognitoTabs.insert(tab, at: 0) } else { tabs.insert(tab, at: 0) }
         currentTabID = tab.id
         goHome()
-        // 不强制关闭标签管理：在标签管理里新建时，新卡片会原地弹出动画显示
+        pagePopTrigger += 1   // 触发新页面左下角弹出动画
         scheduleTabPersist()
     }
 

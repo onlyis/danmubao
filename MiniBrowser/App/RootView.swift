@@ -5,6 +5,7 @@ struct RootView: View {
     @EnvironmentObject var vm: BrowserViewModel
     @EnvironmentObject var toasts: ToastStore
     @Environment(\.colorScheme) private var systemScheme
+    @State private var pagePop: CGFloat = 1
 
     /// 当前是否处于深色（用于 OLED 纯黑判断）
     private var isDark: Bool {
@@ -40,6 +41,11 @@ struct RootView: View {
                 }
             }
             .padding(.bottom, Theme.Size.toolbarHeight)
+            .scaleEffect(pagePop, anchor: .bottomLeading)   // 新建标签：从左下角弹出
+            .onChange(of: vm.pagePopTrigger) { _, _ in
+                pagePop = 0.1
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.78).delay(0.12)) { pagePop = 1 }
+            }
 
             // 底部固定工具栏（主页态不创建引擎）
             BottomToolbar(engine: vm.isBrowsing ? vm.currentTab?.engine : nil)
