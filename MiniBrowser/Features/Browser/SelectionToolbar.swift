@@ -3,17 +3,23 @@ import SwiftUI
 /// 划词浮层：选中网页文本后弹出，提供 复制 / 翻译 / 搜索 / BigBang 文本选取。
 struct SelectionToolbar: View {
     @EnvironmentObject var vm: BrowserViewModel
-    @State private var showTranslation = false
     @State private var showBigBang = false
 
     var body: some View {
         VStack(spacing: 10) {
             // 操作栏
             HStack(spacing: 0) {
-                action("复制", "doc.on.doc") { dismiss() }
+                action("复制", "doc.on.doc") {
+                    UIPasteboard.general.string = vm.selectionText
+                    vm.showToast("已复制", symbol: "doc.on.doc")
+                    dismiss()
+                }
                 divider
+                // 翻译：调起系统翻译面板（iOS 17.4+），旧系统降级提示
                 action("翻译", "character.bubble") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showTranslation = true }
+                    let text = vm.selectionText
+                    dismiss()
+                    vm.presentTranslation(text)
                 }
                 divider
                 action("搜索", "magnifyingglass") {
@@ -29,10 +35,6 @@ struct SelectionToolbar: View {
             .overlay(Capsule().strokeBorder(Color.black.opacity(0.06), lineWidth: Theme.Size.hairline))
             .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
 
-            // 翻译卡片
-            if showTranslation {
-                translationCard.transition(.scale(scale: 0.9).combined(with: .opacity))
-            }
             // BigBang 文本选取
             if showBigBang {
                 bigBangCard.transition(.scale(scale: 0.9).combined(with: .opacity))
@@ -67,23 +69,6 @@ struct SelectionToolbar: View {
             .padding(.horizontal, 6)
         }
         .buttonStyle(PressableStyle())
-    }
-
-    private var translationCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("自动检测 → 中文").font(.system(size: 12)).foregroundStyle(Theme.Colors.secondaryText)
-                Spacer()
-                Image(systemName: "speaker.wave.2").font(.system(size: 13)).foregroundStyle(Theme.Colors.accent)
-            }
-            Text(vm.selectionText).font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.Colors.primaryText)
-            Hairline()
-            Text("Legend of Qin").font(.system(size: 16)).foregroundStyle(Theme.Colors.accent)
-        }
-        .padding(Theme.Spacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Colors.card, in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
     }
 
     /// BigBang：把选中文本拆成可点选的词块

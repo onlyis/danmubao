@@ -31,6 +31,10 @@
 	<string>用于保存图片与二维码到相册。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>用于从相册选择图片识别二维码。</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

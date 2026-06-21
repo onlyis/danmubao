@@ -1,4 +1,5 @@
 import SwiftUI
+import Translation
 
 /// 根视图：协调 主页/网页 主体、底部工具栏、各类弹出层与全屏页面。
 struct RootView: View {
@@ -74,6 +75,14 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
         }
+        .sheet(isPresented: $vm.showAirPlay) {
+            AirPlaySheet()
+                .presentationDetents([.height(420)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(Theme.Radius.sheet)
+        }
+        .sheet(item: $vm.pdfPreviewURL) { item in PDFViewerView(url: item.url) }
+        .sheet(item: $vm.textFileURL) { url in TextFileView(url: url) }
         // 网站设置面板（详细）
         .sheet(isPresented: $vm.showWebsiteSettings) {
             WebsiteSettingsSheet()
@@ -141,6 +150,7 @@ struct RootView: View {
                 .transition(.opacity).zIndex(30)
             }
         }
+        .modifier(TranslationPresenterModifier())
         // 全局轻提示
         .overlay {
             if let toast = toasts.toast { ToastView(message: toast) }
@@ -169,5 +179,15 @@ struct RootView: View {
         case .plugins:      PluginMarketView()
         case .searchEngine: SearchEngineView()
         }
+    }
+}
+
+/// 系统翻译面板修饰器：把 .translationPresentation 的可用性守卫收敛到一处。
+private struct TranslationPresenterModifier: ViewModifier {
+    @EnvironmentObject var vm: BrowserViewModel
+    func body(content: Content) -> some View {
+        if #available(iOS 17.4, *) {
+            content.translationPresentation(isPresented: $vm.showTranslate, text: vm.translateText)
+        } else { content }
     }
 }

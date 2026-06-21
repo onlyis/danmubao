@@ -428,8 +428,8 @@ final class BrowserViewModel: ObservableObject {
         case "下载": route = .downloads
         case "文件": route = .files
         case "阅读模式": openReadingMode()
-        case "漫画模式": route = .comic
-        case "网页翻译": route = .translate
+        case "漫画模式": openComicMode()
+        case "网页翻译": translateCurrentPage()
         case "工具箱": route = .toolbox
         case "开发者工具": route = .devtools
         case "Cookie管理": route = .cookies
@@ -458,6 +458,12 @@ final class BrowserViewModel: ObservableObject {
         case "视频悬浮", "画中画": return openVideoFloat()
         case "标记广告": showMarkAds = true
         case "网站设置": showWebsiteSettings = true
+        case "视频截图": captureVideoFrame()
+        case "镜像播放": toggleVideoMirror()
+        case "后台播放": enableBackgroundPlayback()
+        case "AirPlay": showAirPlay = true
+        case "Eruda": guardEngine { $0.injectDevConsole(.eruda) }; showToast("正在注入 Eruda 控制台…", symbol: "ladybug")
+        case "vConsole": guardEngine { $0.injectDevConsole(.vconsole) }; showToast("正在注入 vConsole 控制台…", symbol: "terminal")
         case "WebArchive": saveWebArchive()
         case "网页长截图": saveFullScreenshot()
 case "生成二维码": showQRGenerate = true
@@ -688,6 +694,85 @@ func resetSitePermissions() {
         showToast("已重置站点设置", symbol: "arrow.counterclockwise")
     }
 }
+
+    // MARK: - workflow 批量功能（视频增强/AirPlay/漫画/翻译/PDF/文本/压缩）
+    @Published var showAirPlay = false
+    @Published var translateText: String = ""
+    @Published var showTranslate: Bool = false
+    struct PDFPreviewItem: Identifiable { let id = UUID(); let url: URL }
+    @Published var pdfPreviewURL: PDFPreviewItem?
+    @Published var textFileURL: URL?
+
+    func captureVideoFrame() {
+        guardEngine { [weak self] engine in
+            engine.videoCaptureFrame { image in
+                guard let self else { return }
+                guard let data = image?.pngData() else { self.showToast("未检测到视频或无法截图", symbol: "camera.badge.ellipsis"); return }
+                self.writeToDownloads(data, name: self.pageFileName(ext: "png"), successSymbol: "camera")
+            }
+        }
+    }
+    func toggleVideoMirror() {
+        guardEngine { [weak self] engine in
+            engine.videoToggleMirror { mirrored in
+                guard let self else { return }
+                guard let mirrored else { self.showToast("未检测到视频", symbol: "play.slash"); return }
+                self.showToast(mirrored ? "已开启镜像播放" : "已关闭镜像播放", symbol: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+            }
+        }
+    }
+    func enableBackgroundPlayback() {
+        guardEngine { [weak self] engine in
+            guard let self else { return }
+            do { try engine.enableBackgroundPlayback(); self.showToast("已开启后台播放", symbol: "play.circle") }
+            catch { self.showToast("后台播放开启失败", symbol: "exclamationmark.circle") }
+        }
+    }
+    /// 进入漫画模式：提取真实图片做长图阅读。
+    func openComicMode() {
+        guard isBrowsing, let engine else { pageImages = []; route = .comic; return }
+        engine.fetchImageURLs { [weak self] urls in self?.pageImages = urls; self?.route = .comic }
+    }
+    /// 对给定文本弹系统翻译面板（iOS 17.4+）。
+    func presentTranslation(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { showToast("没有可翻译的文本", symbol: "exclamationmark.circle"); return }
+        if #available(iOS 17.4, *) { translateText = String(trimmed.prefix(2000)); showTranslate = true }
+        else { showToast("翻译需要 iOS 17.4 或更高版本", symbol: "character.bubble") }
+    }
+    /// 翻译当前网页：优先选中文本, 否则抓正文。
+    func translateCurrentPage() {
+        if #available(iOS 17.4, *) {
+            let selected = selectionText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !selected.isEmpty { presentTranslation(selected); return }
+            guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+            engine.fetchPageText { [weak self] text in
+                guard let self else { return }
+                let t = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !t.isEmpty else { self.showToast("未获取到页面文本", symbol: "exclamationmark.circle"); return }
+                self.presentTranslation(t)
+            }
+        } else { route = .translate }
+    }
+    /// 用 PDF 阅读器打开下载目录内 PDF。
+    func openPDF(fileName: String) {
+        let url = DownloadManager.downloadsDirectory.appendingPathComponent(fileName)
+        guard FileManager.default.fileExists(atPath: url.path) else { showToast("文件不存在", symbol: "exclamationmark.circle"); return }
+        pdfPreviewURL = PDFPreviewItem(url: url)
+    }
+    /// 以纯文本打开下载目录内文件。
+    func openTextFile(named name: String) { textFileURL = DownloadManager.downloadsDirectory.appendingPathComponent(name) }
+    /// 压缩下载目录里的图片。
+    @discardableResult
+    func compressImage(name: String) -> Bool {
+        do {
+            let result = try ImageCompressor.compress(fileName: name)
+            let before = ByteCountFormatter.string(fromByteCount: result.originalBytes, countStyle: .file)
+            let after = ByteCountFormatter.string(fromByteCount: result.compressedBytes, countStyle: .file)
+            showToast("已压缩：\(before) → \(after)（省 \(Int((result.savedRatio*100).rounded()))%）", symbol: "photo.badge.arrow.down")
+            return true
+        } catch { showToast("压缩失败：\(error.localizedDescription)", symbol: "exclamationmark.triangle.fill"); return false }
+    }
 
     // MARK: - 书签（委托 LibraryStore，附带 Toast 反馈）
     func addBookmark(title: String, url: String) {

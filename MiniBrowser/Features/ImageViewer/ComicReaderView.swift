@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// 漫画看图模式：纵向长图连续阅读、单页/双页切换、方向适配、缩放拖动。
+/// 真实图片来自 `vm.pageImages`（进入前由 `openComicMode` 提取）；为空时回退为占位色块演示。
 struct ComicReaderView: View {
+    @EnvironmentObject var vm: BrowserViewModel
     @Environment(\.dismiss) private var dismiss
 
     enum Mode { case vertical, single, dual }
@@ -11,7 +13,12 @@ struct ComicReaderView: View {
     @State private var lastZoom: CGFloat = 1
     @State private var page = 1
 
-    private let pageCount = 12
+    /// 真实图片地址（空 = 占位演示）
+    private var images: [String] { vm.pageImages }
+    /// 页数：有真实图片用其数量，否则回退到占位页数
+    private var pageCount: Int { images.isEmpty ? placeholderCount : images.count }
+
+    private let placeholderCount = 12
     private let palette: [Color] = [0x2C3E50, 0x34495E, 0x46607A, 0x3A5068, 0x2E4055].map { Color(hex: $0) }
 
     var body: some View {
@@ -38,6 +45,7 @@ struct ComicReaderView: View {
         switch mode {
         case .vertical:
             ScrollView {
+                // LazyVStack 内 AsyncImage 惰性加载，长图不会一次性全部请求
                 LazyVStack(spacing: 2) {
                     ForEach(0..<pageCount, id: \.self) { i in comicPage(i, height: 520) }
                 }
@@ -51,10 +59,10 @@ struct ComicReaderView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
         case .dual:
             TabView(selection: $page) {
-                ForEach(0..<(pageCount / 2), id: \.self) { i in
+                ForEach(0..<((pageCount + 1) / 2), id: \.self) { i in
                     HStack(spacing: 2) {
                         comicPage(i * 2, height: nil)
-                        comicPage(i * 2 + 1, height: nil)
+                        if i * 2 + 1 < pageCount { comicPage(i * 2 + 1, height: nil) }
                     }.tag(i + 1)
                 }
             }
@@ -62,18 +70,48 @@ struct ComicReaderView: View {
         }
     }
 
+    /// 单页：有真实地址则用 AsyncImage，否则回退到渐变占位
+    @ViewBuilder
     private func comicPage(_ i: Int, height: CGFloat?) -> some View {
-        LinearGradient(colors: [palette[i % palette.count], palette[i % palette.count].opacity(0.7)],
-                       startPoint: .top, endPoint: .bottom)
+        if let url = imageURL(i) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let img):
+                    img.resizable().scaledToFit()
+                case .failure:
+                    placeholderPage(i, height: height).overlay {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 26)).foregroundStyle(.white.opacity(0.6))
+                    }
+                default:
+                    placeholderPage(i, height: height).overlay { ProgressView().tint(.white) }
+                }
+            }
             .frame(maxWidth: .infinity)
             .frame(height: height)
             .frame(maxHeight: height == nil ? .infinity : nil)
-            .overlay {
+        } else {
+            placeholderPage(i, height: height).overlay {
                 VStack(spacing: 8) {
                     Image(systemName: "photo").font(.system(size: 30)).foregroundStyle(.white.opacity(0.5))
                     Text("第 \(i + 1) 页").font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
                 }
             }
+        }
+    }
+
+    private func placeholderPage(_ i: Int, height: CGFloat?) -> some View {
+        LinearGradient(colors: [palette[i % palette.count], palette[i % palette.count].opacity(0.7)],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .frame(maxHeight: height == nil ? .infinity : nil)
+    }
+
+    /// 第 i 页对应的真实图片地址（占位模式或越界返回 nil）
+    private func imageURL(_ i: Int) -> URL? {
+        guard images.indices.contains(i) else { return nil }
+        return URL(string: images[i])
     }
 
     private var chrome: some View {
@@ -110,8 +148,10 @@ struct ComicReaderView: View {
 
                 HStack(spacing: Theme.Spacing.m) {
                     Text("1").font(.system(size: 12)).foregroundStyle(.white.opacity(0.7))
-                    Slider(value: Binding(get: { Double(page) }, set: { page = Int($0) }), in: 1...Double(pageCount), step: 1)
+                    Slider(value: Binding(get: { Double(page) }, set: { page = Int($0) }),
+                           in: 1...Double(max(pageCount, 1)), step: 1)
                         .tint(.white)
+                        .disabled(pageCount <= 1)
                     Text("\(pageCount)").font(.system(size: 12)).foregroundStyle(.white.opacity(0.7))
                 }
             }

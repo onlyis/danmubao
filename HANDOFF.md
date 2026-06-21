@@ -190,6 +190,17 @@ MiniBrowser/
 
 ## 5. 未完成 / 占位（明确告知用户的待办）
 
+> **2026-06-22 第二批 workflow（2 workflow×6 agent 并行, 集成 9 个, 已构建+启动验证）**：
+> - 视频增强: 视频截图(canvas→PNG 存下载)、镜像播放(scaleX(-1))、后台播放(AVAudioSession, 新文件 BackgroundAudio.swift + project.yml UIBackgroundModes audio)。菜单「视频截图/镜像播放/后台播放」接真。
+> - AirPlay: 真实系统路由(AVRoutePickerView, 新文件 AirPlayButton.swift→AirPlaySheet, vm.showAirPlay)。菜单「AirPlay」接真。
+> - 开发者工具: 注入 Eruda/vConsole 真实调试浮窗(WebEngine.injectDevConsole, CDN)。菜单「Eruda/vConsole」+ DevToolsView 接真。
+> - Cookie 管理: 真实读写 WKWebsiteDataStore.httpCookieStore(CookieManagerView 抽到新文件, 从 FeatureViews 删旧占位)。
+> - 漫画模式: 真实图片长图(vm.openComicMode 复用 fetchImageURLs, ComicReaderView 重写)。
+> - 翻译: 系统 Translation 框架 .translationPresentation(iOS 17.4+, 免 Key, @available 守卫降级)。菜单「网页翻译」+ 划词「翻译」接真; RootView 加 TranslationPresenterModifier。
+> - PDF 阅读(PDFViewerView, PDFKit, vm.pdfPreviewURL)、纯文本查看/编辑(TextFileView, vm.textFileURL)、图片压缩(ImageCompressor.swift, vm.compressImage)。入口在文件行菜单(FilesView fileMenuContent 加按钮)。
+> - **本批暂缓(未集成)**: ① 标记广告真实化(agent 漏交了 WebEngine 的 beginElementPick/applyAdHide 等方法, 引用悬空); ② 文件导入(从系统/相册, 需改 FilesView 导入按钮); ③ 设置占位真实化(AboutPages, 需改 HomeView/SettingsView/init)。这三项的部分产物已弃, 待下一轮补全。
+
+
 > **2026-06-22 workflow 批量实现（6 功能, 已构建通过 + 阅读/二维码运行截图验证）**：
 > - **阅读模式正文抽取**：`WebEngine.fetchReadableArticle`（自写简化 Readability JS，选文本量最大容器、收集 h1-h3/p、去噪去重）→ `vm.openReadingMode()` 填 `vm.readingArticle` 后 route；`ReadingModeView` 重写渲染真实正文。菜单「阅读模式」接真。
 > - **网页保存增强**：`WebArchive`（`createWebArchiveData`）+ 整页长截图（`fullPageSnapshot` 临时撑开 frame 截全页）→ `vm.saveWebArchive()`/`saveFullScreenshot()` 落地下载。菜单「WebArchive」「网页长截图」接真。

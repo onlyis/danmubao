@@ -49,6 +49,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIStatusBarStyle: UIStatusBarStyleDefault
+        UIBackgroundModes:
+          - audio
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         NSCameraUsageDescription: 用于扫描二维码。

@@ -29,7 +29,10 @@ struct FilesView: View {
             compress: { compress(file) },
             extract: { extract(file) },
             rename: { renameText = file.name; renameTarget = file },
-            move: { moveTarget = file })
+            move: { moveTarget = file },
+            openPDF: { vm.openPDF(fileName: file.name) },
+            openText: { vm.openTextFile(named: file.name) },
+            compressImg: { if vm.compressImage(name: file.name) { reload() } })
     }
 
     var body: some View {
@@ -193,6 +196,9 @@ struct FileActions {
     var extract: () -> Void
     var rename: () -> Void
     var move: () -> Void
+    var openPDF: () -> Void = {}
+    var openText: () -> Void = {}
+    var compressImg: () -> Void = {}
 }
 
 /// 文件的菜单项（行 Menu 与格 contextMenu 共用，含分享）。
@@ -206,6 +212,12 @@ private func fileMenuContent(_ file: FileItem, _ a: FileActions) -> some View {
     if !file.isFolder {
         if isZip { Button(action: a.extract) { Label("解压到此处", systemImage: "archivebox") } }
         else { Button(action: a.compress) { Label("压缩为 zip", systemImage: "doc.zipper") } }
+    }
+    let ext = (file.name as NSString).pathExtension.lowercased()
+    if !file.isFolder {
+        if ext == "pdf" { Button(action: a.openPDF) { Label("用阅读器打开", systemImage: "doc.richtext") } }
+        if ["jpg","jpeg","png","heic","gif","webp"].contains(ext) { Button(action: a.compressImg) { Label("压缩图片", systemImage: "rectangle.compress.vertical") } }
+        Button(action: a.openText) { Label("以纯文本打开", systemImage: "doc.plaintext") }
     }
     Button(role: .destructive, action: a.delete) { Label("删除", systemImage: "trash") }
 }

@@ -105,6 +105,8 @@ struct SourceCodeView: View {
 
 // MARK: - 开发者工具
 struct DevToolsView: View {
+    @EnvironmentObject var vm: BrowserViewModel
+    @Environment(\.dismiss) private var dismiss
     private let tools: [(String, String, Color)] = [
         ("查看源码", "chevron.left.forwardslash.chevron.right", Color(hex: 0x5856D6)),
         ("Eruda 控制台", "ladybug", Color(hex: 0xFF3B30)),
@@ -116,46 +118,30 @@ struct DevToolsView: View {
     var body: some View {
         List {
             ForEach(tools, id: \.0) { t in
-                Button { } label: { SettingRowLabel(title: t.0, symbol: t.1, color: t.2) }
+                Button { handle(t.0) } label: { SettingRowLabel(title: t.0, symbol: t.1, color: t.2) }
             }
         }
         .navigationTitle("开发者工具").navigationBarTitleDisplayMode(.inline)
         .toolbar { dismissDoneIfRoot() }
     }
+
+    /// 已接真的开发者工具入口；注入控制台后收起本页，让网页右下角的调试浮窗可见。
+    private func handle(_ title: String) {
+        switch title {
+        case "查看源码":
+            vm.viewSource()
+            dismiss()
+        case "Eruda 控制台":
+            if vm.performMenuAction("Eruda") { dismiss() }
+        case "vConsole":
+            if vm.performMenuAction("vConsole") { dismiss() }
+        default:
+            break   // Cookie 管理 / 网络请求 / DOM 检查 仍为占位
+        }
+    }
 }
 
 // MARK: - Cookie 管理
-struct CookieManagerView: View {
-    struct Cookie: Identifiable { let id = UUID(); var name: String; var value: String }
-    @State private var cookies: [Cookie] = [
-        .init(name: "session_id", value: "a1b2c3d4e5f6..."),
-        .init(name: "_ga", value: "GA1.2.123456789"),
-        .init(name: "theme", value: "dark"),
-    ]
-    var body: some View {
-        List {
-            Section("当前网站 Cookies") {
-                ForEach(cookies) { c in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(c.name).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.Colors.primaryText)
-                        Text(c.value).font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.Colors.secondaryText).lineLimit(1)
-                    }
-                    .swipeActions {
-                        Button(role: .destructive) { } label: { Label("删除", systemImage: "trash") }
-                        Button { } label: { Label("复制", systemImage: "doc.on.doc") }.tint(Theme.Colors.accent)
-                    }
-                }
-            }
-            Section {
-                Button { } label: { Label("注入 Cookie", systemImage: "plus.circle") }
-                Button { } label: { Label("分享 Cookie", systemImage: "square.and.arrow.up") }
-                Button(role: .destructive) { } label: { Label("清空当前网站 Cookie", systemImage: "trash") }
-            }
-        }
-        .navigationTitle("Cookie 管理").navigationBarTitleDisplayMode(.inline)
-        .toolbar { dismissDoneIfRoot() }
-    }
-}
 
 // MARK: - 网页翻译
 struct TranslateView: View {

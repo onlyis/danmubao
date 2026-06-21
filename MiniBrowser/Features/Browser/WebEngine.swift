@@ -353,6 +353,67 @@ func clearSiteData(host: String, completion: @escaping () -> Void) {
     }
 }
 
+    // MARK: - 视频增强 / 开发者控制台 / 整页文本（workflow 集成）
+    func videoCaptureFrame(completion: @escaping (UIImage?) -> Void) {
+        let js = videoScript("""
+        try {
+          var w = v.videoWidth || v.clientWidth, h = v.videoHeight || v.clientHeight;
+          if (!w || !h) return null;
+          var c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(v, 0, 0, w, h);
+          return c.toDataURL('image/png');
+        } catch (e) { return null; }
+        """)
+        webView.evaluateJavaScript(js) { result, _ in
+            guard let dataURL = result as? String, let comma = dataURL.firstIndex(of: ","),
+                  let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),
+                  let image = UIImage(data: data) else { completion(nil); return }
+            completion(image)
+        }
+    }
+    func videoToggleMirror(completion: @escaping (Bool?) -> Void) {
+        let js = videoScript("""
+        var t = (v.style.transform || ''); var has = t.indexOf('scaleX(-1)') !== -1;
+        if (has) { v.style.transform = t.replace('scaleX(-1)', '').trim(); return false; }
+        else { v.style.transform = (t + ' scaleX(-1)').trim(); return true; }
+        """)
+        webView.evaluateJavaScript(js) { result, _ in Task { @MainActor in completion(result as? Bool) } }
+    }
+    /// 开启后台播放：AVFoundation 依赖隔离在 BackgroundAudio（独立文件）。
+    func enableBackgroundPlayback() throws { try BackgroundAudio.enable() }
+
+    /// 可注入的移动端调试控制台类型。
+    enum DevConsole {
+        case eruda, vconsole
+        var src: String { self == .eruda ? "https://cdn.jsdelivr.net/npm/eruda" : "https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js" }
+        var initCall: String { self == .eruda ? "if(window.eruda){eruda.init();}" : "if(window.VConsole){window.__mb_vconsole=new window.VConsole();}" }
+        var flagID: String { self == .eruda ? "__mb_eruda" : "__mb_vconsole_loader" }
+    }
+    /// 向当前页注入调试控制台（CDN 动态加载, 幂等）。
+    func injectDevConsole(_ kind: DevConsole) {
+        let js = """
+        (function(){
+          if (document.getElementById('\(kind.flagID)')) { \(kind.initCall) return; }
+          var s = document.createElement('script'); s.id='\(kind.flagID)'; s.src='\(kind.src)';
+          s.onload = function(){ \(kind.initCall) };
+          (document.head || document.documentElement).appendChild(s);
+        })();
+        """
+        webView.evaluateJavaScript(js)
+    }
+    /// 抓取页面主要可见文本（整页翻译用）。
+    func fetchPageText(_ completion: @escaping (String?) -> Void) {
+        let js = """
+        (function(){
+          var root = document.querySelector('article') || document.querySelector('[role=main]')
+                  || document.querySelector('main') || document.body;
+          var t = (root && root.innerText ? root.innerText : (document.body ? document.body.innerText : ''));
+          return (t || '').replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 4000);
+        })();
+        """
+        webView.evaluateJavaScript(js) { r, _ in completion(r as? String) }
+    }
+
     // MARK: - 输入归一化：网址 or 搜索关键词
     static func normalize(_ text: String, searchTemplate: String) -> URL {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
