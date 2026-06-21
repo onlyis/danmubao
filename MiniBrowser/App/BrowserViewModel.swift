@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// 全局浏览器状态。本阶段聚焦 UI 与流程，数据均为示例数据。
 @MainActor
@@ -10,7 +11,9 @@ final class BrowserViewModel: ObservableObject {
     @Published var isIncognito: Bool = false
     @Published var isNightMode: Bool = false
     @Published var isNoImageMode: Bool = false
-    @Published var isAdBlockOn: Bool = true
+    /// 广告拦截状态：派生自广告类插件是否启用（单一真相源 = PluginStore）。
+    /// 只读镜像——通过 `toggleAdBlock()` 驱动插件，避免开关与真实拦截脱节。
+    @Published private(set) var isAdBlockOn: Bool = true
     @Published var isDesktopMode: Bool = false
 
     // MARK: - 外观
@@ -42,7 +45,7 @@ final class BrowserViewModel: ObservableObject {
     enum Route: Identifiable {
         case bookmarks, history, downloads, files, settings
         case reading, imageViewer, comic, toolbox, qrScanner, reader, translate
-        case adblock, jsExtensions, devtools, cookies, gestures, plugins
+        case jsExtensions, devtools, cookies, gestures, plugins
         var id: String { String(describing: self) }
     }
     @Published var route: Route?
@@ -96,6 +99,21 @@ final class BrowserViewModel: ObservableObject {
             currentTabID = tabs.first?.id
         }
         for t in tabs { tabIndex[t.id] = t }
+
+        // 广告拦截开关镜像广告类插件的启用状态（PluginStore 为单一真相源）。
+        // assign(to:) 不强引用 self，订阅时即用当前值同步一次。
+        PluginStore.shared.$plugins
+            .map { $0.contains { $0.category == .adblock && $0.installed && $0.enabled } }
+            .assign(to: &$isAdBlockOn)
+    }
+
+    /// 切换广告拦截：驱动所有已安装的广告类插件启用/停用；isAdBlockOn 经由上面的管道回流刷新。
+    func toggleAdBlock() {
+        let target = !isAdBlockOn
+        for p in PluginStore.shared.plugins where p.category == .adblock && p.installed {
+            PluginStore.shared.setEnabled(p, target)
+        }
+        showToast(target ? "已开启广告拦截" : "已关闭广告拦截", symbol: "shield.lefthalf.filled")
     }
 
     // MARK: - 标签持久化（合并写，避免连续增删反复整表编码）

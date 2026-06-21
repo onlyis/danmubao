@@ -110,7 +110,6 @@ struct RootView: View {
         case .qrScanner:    QRScannerView()
         case .reader:       EbookLibraryView()
         case .translate:    TranslateView()
-        case .adblock:      AdBlockView()
         case .jsExtensions: JSExtensionsView()
         case .devtools:     DevToolsView()
         case .cookies:      CookieManagerView()

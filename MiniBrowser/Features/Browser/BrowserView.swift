@@ -37,10 +37,10 @@ private struct BrowserContent: View {
         }
         .background(Theme.Colors.card)
         .onAppear {
-            // 长按链接的「下载」动作接到真实下载管理器
-            engine.onRequestDownload = { url in
+            // 长按链接的「下载」动作接到真实下载管理器（弱引用 vm，避免 vm→tab→engine→闭包→vm 循环）
+            engine.onRequestDownload = { [weak vm] url in
                 manager.start(urlString: url.absoluteString)
-                vm.showToast("开始下载…", symbol: "arrow.down.circle")
+                vm?.showToast("开始下载…", symbol: "arrow.down.circle")
             }
         }
         .onChange(of: vm.isDesktopMode) { _, on in engine.setDesktop(on) }

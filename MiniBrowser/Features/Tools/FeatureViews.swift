@@ -1,39 +1,5 @@
 import SwiftUI
 
-// MARK: - 广告拦截
-struct AdBlockView: View {
-    @EnvironmentObject var vm: BrowserViewModel
-    @State private var intrusive = true
-    @State private var multiLang = true
-    var body: some View {
-        List {
-            Section {
-                Toggle("启用广告拦截", isOn: $vm.isAdBlockOn)
-                Toggle("屏蔽侵入式广告", isOn: $intrusive)
-                Toggle("多语言规则", isOn: $multiLang)
-            }
-            Section("规则") {
-                NavigationLink("Adblock Plus 规则") { PlaceholderSettings(title: "Adblock Plus") }
-                NavigationLink("第三方规则") { PlaceholderSettings(title: "第三方规则") }
-                NavigationLink("自定义规则") { PlaceholderSettings(title: "自定义规则") }
-                NavigationLink("用户标记广告规则") { PlaceholderSettings(title: "标记规则") }
-            }
-            Section("名单") {
-                NavigationLink("白名单网站") { PlaceholderSettings(title: "白名单") }
-                NavigationLink("黑名单网站") { PlaceholderSettings(title: "黑名单") }
-            }
-            Section {
-                Button("更新规则") { }
-                Button("导入规则") { }
-                Button("导出规则") { }
-                Button("清除当前网站规则") { }.foregroundStyle(Theme.Colors.danger)
-            }
-        }
-        .navigationTitle("广告拦截").navigationBarTitleDisplayMode(.inline)
-        .toolbar { dismissDoneIfRoot() }
-    }
-}
-
 // MARK: - JavaScript 扩展（真实注入，见 UserScriptStore）
 struct JSExtensionsView: View {
     @EnvironmentObject var store: UserScriptStore

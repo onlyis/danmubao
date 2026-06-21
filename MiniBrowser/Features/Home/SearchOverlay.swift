@@ -91,7 +91,14 @@ struct SearchOverlay: View {
         .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { focused = true } }
     }
 
-    private var clipboardURL: String? { "github.com/apple/swift" }
+    /// 真实读取剪贴板，仅当内容像网址（无空格、含点）时提示「打开复制的网址」。
+    /// 用 hasStrings 先判空，避免无内容时触发系统粘贴提示横幅。
+    private var clipboardURL: String? {
+        guard UIPasteboard.general.hasStrings,
+              let s = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !s.isEmpty, !s.contains(" "), s.contains(".") else { return nil }
+        return s
+    }
 
     private var displayedSuggestions: [String] {
         text.isEmpty ? suggestions : suggestions.filter { $0.localizedCaseInsensitiveContains(text) } + [text]

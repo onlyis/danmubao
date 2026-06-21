@@ -33,7 +33,9 @@ struct WebsiteSettingsSheet: View {
 
                 Section {
                     Toggle(isOn: $videoFloat) { rowLabel("视频悬浮", "pip") }
-                    Toggle(isOn: $vm.isAdBlockOn) { rowLabel("广告拦截", "shield.lefthalf.filled") }
+                    Toggle(isOn: Binding(get: { vm.isAdBlockOn }, set: { _ in vm.toggleAdBlock() })) {
+                        rowLabel("广告拦截", "shield.lefthalf.filled")
+                    }
                     Toggle(isOn: $vm.isNoImageMode) { rowLabel("无图模式", "photo.on.rectangle.angled") }
                     Toggle(isOn: $clipboard) { rowLabel("允许访问剪贴板", "doc.on.clipboard") }
                     Toggle(isOn: $newTabLinks) { rowLabel("新标签页打开链接", "plus.square.on.square") }
