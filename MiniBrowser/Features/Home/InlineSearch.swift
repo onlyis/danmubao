@@ -15,12 +15,75 @@ struct InlineSearchView: View {
             SearchSuggestionList(query: query, onPick: submit)
         }
         .background(Theme.Colors.background.ignoresSafeArea())
+        // 键盘上方的引擎条：自定义普通白底（非系统玻璃工具栏），首位固定「取消」
+        .safeAreaInset(edge: .bottom, spacing: 0) { engineBar }
+    }
+
+    /// 键盘上方引擎条：固定「取消」 + 可横滑的 URL 片段/引擎卡
+    private var engineBar: some View {
+        HStack(spacing: 0) {
+            Button { onCancel() } label: {
+                Text("取消")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.Colors.accent)
+                    .padding(.horizontal, 14)
+                    .frame(height: 52)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(["https://", "m.", ".com"], id: \.self) { frag in
+                        Button { query += frag } label: { urlChip(frag) }
+                    }
+                    ForEach(vm.allSearchEngines) { e in
+                        Button { tapEngine(e) } label: { engineChip(e) }
+                    }
+                }
+                .padding(.trailing, 12)
+                .padding(.vertical, 6)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Colors.card)   // 普通白色背景，无玻璃特效
+        .overlay(alignment: .top) { Rectangle().fill(Theme.Colors.separator).frame(height: Theme.Size.hairline) }
     }
 
     private func submit(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty else { return }
         onSubmit(t)
+    }
+
+    /// 点击引擎：设为默认并带着当前内容用该引擎搜索（内容为空则仅切换默认）。
+    private func tapEngine(_ e: SearchEngine) {
+        Haptics.light()
+        vm.searchEngine = e
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty { submit(q) }
+    }
+
+    /// URL 片段小卡（白底圆角）
+    private func urlChip(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15))
+            .foregroundStyle(Theme.Colors.primaryText)
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(Theme.Colors.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.Colors.separator, lineWidth: 0.5))
+    }
+
+    /// 引擎方卡：未选=浅底品牌色字；选中=品牌色底白字（参考图样式）
+    private func engineChip(_ e: SearchEngine) -> some View {
+        let selected = e.id == vm.searchEngine.id
+        return Text(e.glyph)
+            .font(.system(size: 16, weight: .bold, design: .rounded))
+            .foregroundStyle(selected ? .white : e.color)
+            .frame(width: 40, height: 40)
+            .background(selected ? AnyShapeStyle(e.color) : AnyShapeStyle(Theme.Colors.background),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.Colors.separator, lineWidth: selected ? 0 : 0.5))
     }
 }
 
@@ -44,23 +107,6 @@ private struct SearchInputField: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .onSubmit { onSubmit(query) }
-                    .toolbar {
-                        ToolbarItemGroup(placement: .keyboard) {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(["https://", "m.", ".com"], id: \.self) { frag in
-                                        Button { query += frag } label: { urlChip(frag) }
-                                    }
-                                    // 引擎卡：点击带着内容用该引擎搜索
-                                    ForEach(vm.allSearchEngines) { e in
-                                        Button { tapEngine(e) } label: { engineChip(e) }
-                                    }
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                            }
-                        }
-                    }
                 if !query.isEmpty {
                     Button { query = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.Colors.tertiaryText)
@@ -80,39 +126,6 @@ private struct SearchInputField: View {
             Button("取消") { focused = false; onCancel() }.font(.system(size: 16))
         }
         .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { focused = true } }
-    }
-
-    /// 点击引擎：设为默认并带着当前内容用该引擎搜索（内容为空则仅切换默认）。
-    private func tapEngine(_ e: SearchEngine) {
-        Haptics.light()
-        vm.searchEngine = e
-        let q = query.trimmingCharacters(in: .whitespaces)
-        if !q.isEmpty { onSubmit(q) }
-    }
-
-    /// URL 片段小卡（白底圆角）
-    private func urlChip(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 15))
-            .foregroundStyle(Theme.Colors.primaryText)
-            .padding(.horizontal, 14)
-            .frame(height: 40)
-            .background(Theme.Colors.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Theme.Colors.separator, lineWidth: 0.5))
-    }
-
-    /// 引擎方卡：未选=白底品牌色字；选中=品牌色底白字（参考图样式）
-    private func engineChip(_ e: SearchEngine) -> some View {
-        let selected = e.id == vm.searchEngine.id
-        return Text(e.glyph)
-            .font(.system(size: 16, weight: .bold, design: .rounded))
-            .foregroundStyle(selected ? .white : e.color)
-            .frame(width: 40, height: 40)
-            .background(selected ? AnyShapeStyle(e.color) : AnyShapeStyle(Theme.Colors.card),
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Theme.Colors.separator, lineWidth: selected ? 0 : 0.5))
     }
 }
 
