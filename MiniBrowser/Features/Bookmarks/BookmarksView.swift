@@ -5,6 +5,12 @@ struct BookmarksView: View {
     var body: some View { BookmarkFolderView(folderID: nil, title: "书签", isRoot: true) }
 }
 
+/// 包一层让导出文件 URL 可作为 `.sheet(item:)` 的标识（URL 本身不是 Identifiable）。
+private struct ExportedFile: Identifiable {
+    let url: URL
+    var id: String { url.path }
+}
+
 /// 某个文件夹（folderID == nil 为根目录）的书签列表，可递归进入子文件夹。
 struct BookmarkFolderView: View {
     @EnvironmentObject var vm: BrowserViewModel
@@ -20,6 +26,10 @@ struct BookmarkFolderView: View {
     @State private var moving: Bookmark?
     @State private var newFolderName = ""
     @State private var showNewFolder = false
+
+    // 导入 / 导出
+    @State private var showImporter = false
+    @State private var exportedFile: ExportedFile?
 
     var body: some View {
         List {
@@ -46,8 +56,8 @@ struct BookmarkFolderView: View {
 
             if isRoot && search.isEmpty {
                 Section {
-                    Button { } label: { Label("导入书签", systemImage: "square.and.arrow.down") }
-                    Button { } label: { Label("导出书签", systemImage: "square.and.arrow.up") }
+                    Button { showImporter = true } label: { Label("导入书签", systemImage: "square.and.arrow.down") }
+                    Button { exportBookmarks() } label: { Label("导出书签", systemImage: "square.and.arrow.up") }
                     Label { Text("iCloud 同步") } icon: { Image(systemName: "icloud") }
                 }
             }
@@ -75,6 +85,17 @@ struct BookmarkFolderView: View {
         .sheet(item: $moving) { bm in
             BookmarkMoveSheet(bookmark: bm)
         }
+        .sheet(isPresented: $showImporter) {
+            BookmarkImportPicker { url in
+                showImporter = false
+                importBookmarks(from: url)
+            }
+            .ignoresSafeArea()
+        }
+        // 导出成功后弹系统分享（用户可另存到「文件」/隔空投送等），文件已落地 Downloads。
+        .sheet(item: $exportedFile) { file in
+            ActivityView(items: [file.url])
+        }
         .alert("新建文件夹", isPresented: $showNewFolder) {
             TextField("文件夹名称", text: $newFolderName)
             Button("取消", role: .cancel) { newFolderName = "" }
@@ -89,6 +110,26 @@ struct BookmarkFolderView: View {
         let list = library.children(of: folderID)
         guard !search.isEmpty else { return list }
         return list.filter { $0.title.localizedCaseInsensitiveContains(search) }
+    }
+
+    /// 导出全部书签为 Netscape HTML 到 Downloads，并弹分享面板。
+    private func exportBookmarks() {
+        guard let url = library.exportHTML() else {
+            vm.showToast("导出失败", symbol: "exclamationmark.triangle.fill")
+            return
+        }
+        vm.showToast("已导出到下载：\(url.lastPathComponent)", symbol: "square.and.arrow.up")
+        exportedFile = ExportedFile(url: url)
+    }
+
+    /// 从选中的 HTML 文件导入书签。
+    private func importBookmarks(from url: URL) {
+        let count = library.importHTML(from: url)
+        if count > 0 {
+            vm.showToast("已导入 \(count) 个书签", symbol: "square.and.arrow.down")
+        } else {
+            vm.showToast("未找到可导入的书签", symbol: "exclamationmark.triangle.fill")
+        }
     }
 }
 

@@ -427,7 +427,7 @@ final class BrowserViewModel: ObservableObject {
         case "历史": route = .history
         case "下载": route = .downloads
         case "文件": route = .files
-        case "阅读模式": route = .reading
+        case "阅读模式": openReadingMode()
         case "漫画模式": route = .comic
         case "网页翻译": route = .translate
         case "工具箱": route = .toolbox
@@ -458,6 +458,23 @@ final class BrowserViewModel: ObservableObject {
         case "视频悬浮", "画中画": return openVideoFloat()
         case "标记广告": showMarkAds = true
         case "网站设置": showWebsiteSettings = true
+        case "WebArchive": saveWebArchive()
+        case "网页长截图": saveFullScreenshot()
+case "生成二维码": showQRGenerate = true
+case "识别图中码": qrAutoPickPhoto = true; route = .qrScanner
+        // 自动刷新: 循环切换档位(开关型语义, 选择关闭宿主弹层)
+        case "自动刷新": toggleAutoRefresh()
+        // 全屏模式: 隐藏底部工具栏
+        case "全屏模式": toggleFullScreen()
+        // 视频单曲循环: 对页面首个 <video> 切换 loop
+        case "单曲循环":
+            guardEngine { engine in
+                engine.videoToggleLoop { [weak self] on in
+                    guard let self else { return }
+                    guard let on else { self.showToast("未检测到视频", symbol: "play.slash"); return }
+                    self.showToast(on ? "已开启单曲循环" : "已关闭单曲循环", symbol: "repeat.1")
+                }
+            }
         case "主页": goHome()
         // 开关型（停留，不关闭弹层）
         case "无痕模式": toggleIncognito(); return false
@@ -511,6 +528,166 @@ final class BrowserViewModel: ObservableObject {
             self.hasVideo = found
         }
     }
+
+// MARK: - 阅读模式（正文抽取）
+
+/// 当前抽取出的正文（标题 + 来源 host + 段落）。类型定义在 ReadingModeView.swift。
+@Published var readingArticle: ReadableArticle = .empty
+
+/// 进入阅读模式：从当前页面抽取正文（仿 openImageMode 的「先取数据再 route」）。
+/// 非浏览态无网页可抽取，提示后不进入。
+func openReadingMode() {
+    guard isBrowsing, let engine else {
+        showToast("请先打开网页", symbol: "exclamationmark.circle")
+        return
+    }
+    engine.fetchReadableArticle { [weak self] article in
+        self?.readingArticle = article
+        self?.route = .reading
+    }
+}
+    // MARK: - 网页保存增强（WebArchive / 整页长截图）
+
+    /// 保存当前网页为 WebArchive（.webarchive，可被 Safari/系统还原完整离线网页）。
+    func saveWebArchive() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        showToast("正在保存 WebArchive…", symbol: "archivebox")
+        let name = pageFileName(ext: "webarchive")
+        engine.exportWebArchive { [weak self] data in
+            guard let data else { self?.showToast("保存失败", symbol: "exclamationmark.circle"); return }
+            self?.writeToDownloads(data, name: name, successSymbol: "archivebox")
+        }
+    }
+
+    /// 保存当前网页整页长截图（含视口以外内容）为 PNG。
+    func saveFullScreenshot() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        showToast("正在生成长截图…", symbol: "rectangle.portrait.and.arrow.right")
+        let name = pageFileName(ext: "png")
+        engine.fullPageSnapshot { [weak self] image in
+            guard let data = image?.pngData() else { self?.showToast("截图失败", symbol: "exclamationmark.circle"); return }
+            self?.writeToDownloads(data, name: name, successSymbol: "rectangle.portrait.and.arrow.right")
+        }
+    }
+// MARK: - 二维码（生成当前页 / 识别图中码）
+/// 生成当前页二维码弹层标志（RootView 以 .sheet 呈现 QRGenerateSheet）。
+@Published var showQRGenerate = false
+/// 进入扫码页后是否自动弹出相册（供菜单「识别图中码」直达相册识别）。
+@Published var qrAutoPickPhoto = false
+    // MARK: - 自动刷新（循环档位: 0=关 / 15 / 30 / 60 秒）
+    /// 当前自动刷新间隔(秒), 0 表示关闭。仅作展示与档位记忆, 不持久化(刷新行为偏临时)。
+    @Published private(set) var autoRefreshSeconds: Int = 0
+    /// 自动刷新计时器(主线程 Timer)。开档时创建, 关档/换档时失效。
+    private var autoRefreshTimer: Timer?
+    /// 可循环的档位序列。
+    private static let autoRefreshSteps: [Int] = [0, 15, 30, 60]
+
+    /// 循环切换自动刷新档位(0→15→30→60→0), 并按新档位启停计时器、给出提示。
+    func toggleAutoRefresh() {
+        let steps = Self.autoRefreshSteps
+        let idx = steps.firstIndex(of: autoRefreshSeconds) ?? 0
+        let next = steps[(idx + 1) % steps.count]
+        autoRefreshSeconds = next
+        autoRefreshTimer?.invalidate()
+        autoRefreshTimer = nil
+        if next > 0 {
+            // 到点刷新当前网页; 非浏览态(主页)或无引擎时跳过, 不打断也不报错。
+            let timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(next), repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, self.isBrowsing, let engine = self.engine else { return }
+                    engine.reload()
+                }
+            }
+            autoRefreshTimer = timer
+            showToast("自动刷新: 每 \(next) 秒", symbol: "arrow.triangle.2.circlepath")
+        } else {
+            showToast("已关闭自动刷新", symbol: "arrow.triangle.2.circlepath")
+        }
+    }
+
+    // MARK: - 全屏模式（隐藏底部工具栏, 由 RootView 据此条件渲染）
+    /// 是否处于全屏浏览(隐藏底部工具栏, 显示浮动退出按钮)。
+    @Published var isFullScreen: Bool = false
+    /// 切换全屏模式, 并给出提示。
+    func toggleFullScreen() {
+        withAnimation(.easeInOut(duration: 0.2)) { isFullScreen.toggle() }
+        showToast(isFullScreen ? "已进入全屏" : "已退出全屏",
+                  symbol: isFullScreen ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
+    }
+// MARK: - 网站设置（按当前域名）真实化
+
+/// User-Agent 选项标签（供网站设置 Picker 复用，单一真相源）。
+static let userAgentOptions = ["默认", "iPhone", "iPad", "Mac", "Windows"]
+
+/// 当前页面 host（地址栏展示已是 host 优先；用于按站清数据/展示）。
+var currentHost: String { currentURL }
+
+/// 当前引擎 customUserAgent 对应的选项标签（用于面板回显）。
+var currentUserAgentLabel: String {
+    guard let ua = engine?.webView.customUserAgent else { return "默认" }
+    return Self.userAgentLabel(forUA: ua)
+}
+
+/// 标签 -> UA 串映射；返回 nil 表示用系统默认 UA。
+static func userAgentString(for label: String) -> String? {
+    switch label {
+    case "iPhone":  return "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    case "iPad":    return "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    case "Mac":     return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+    case "Windows": return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    default:        return nil   // 默认：交还系统 UA
+    }
+}
+
+/// 由 UA 串反查选项标签（用于面板回显，未知串归为「默认」）。
+private static func userAgentLabel(forUA ua: String) -> String {
+    for label in userAgentOptions where userAgentString(for: label) == ua { return label }
+    return "默认"
+}
+
+/// 设置当前站点 User-Agent（真实写 customUserAgent 并重载生效）。
+func setSiteUserAgent(_ label: String) {
+    guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+    let ua = Self.userAgentString(for: label)
+    // UA 与「桌面版网站」开关同写 customUserAgent，last-writer-wins：手动选 UA 时把桌面开关对齐避免显示矛盾。
+    isDesktopMode = (label == "Mac" || label == "Windows")
+    engine.setUserAgent(ua)
+    showToast(label == "默认" ? "已恢复默认 UA" : "已切换为 \(label) UA", symbol: "person.crop.circle")
+}
+
+/// 清除本站 Cookie / 缓存（按当前 host 的数据记录，异步，回主线程提示）。
+func clearSiteCookies() {
+    guard isBrowsing, let engine, !currentHost.isEmpty else {
+        showToast("请先打开网页", symbol: "exclamationmark.circle"); return
+    }
+    let host = currentHost
+    engine.clearSiteData(host: host) { [weak self] in
+        self?.showToast("已清除「\(host)」的 Cookie 与缓存", symbol: "trash")
+    }
+}
+
+/// 清除本站广告规则：对当前页重新套用所有启用的内容拦截规则并重载（相当于刷新本站拦截状态）。
+func clearSiteAdRules() {
+    guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+    engine.refreshContentRules(reload: true)
+    showToast("已重置本站广告规则", symbol: "shield.lefthalf.filled")
+}
+
+/// 站点权限重置：把该站的本地开关（夜间 / 桌面版 / 自定义 UA）恢复默认，并清掉本站数据。
+func resetSitePermissions() {
+    guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+    let host = currentHost
+    isNightMode = false
+    isDesktopMode = false
+    engine.setUserAgent(nil)
+    if !host.isEmpty {
+        engine.clearSiteData(host: host) { [weak self] in
+            self?.showToast("已重置「\(host)」的站点设置", symbol: "arrow.counterclockwise")
+        }
+    } else {
+        showToast("已重置站点设置", symbol: "arrow.counterclockwise")
+    }
+}
 
     // MARK: - 书签（委托 LibraryStore，附带 Toast 反馈）
     func addBookmark(title: String, url: String) {

@@ -1,12 +1,24 @@
 import SwiftUI
 
-/// 阅读模式：去除干扰，仅标题/正文/图片。底部翻页与进度，可调字体背景。
+/// 阅读模式抽取出的正文：标题 + 来源 host + 段落（h1-h3/p 文本）。
+/// 由 `WebEngine.fetchReadableArticle` 填充，`BrowserViewModel.readingArticle` 持有。
+struct ReadableArticle: Equatable {
+    var title: String
+    var host: String
+    var paragraphs: [String]
+
+    /// 空文章占位（未抽取到正文时展示）。
+    static let empty = ReadableArticle(title: "", host: "", paragraphs: [])
+    var isEmpty: Bool { paragraphs.isEmpty }
+}
+
+/// 阅读模式：去除干扰，仅标题/正文。可调字体背景，连续滚动呈现真实抽取的正文。
 struct ReadingModeView: View {
+    @EnvironmentObject var vm: BrowserViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showSettings = false
     @State private var fontSize: CGFloat = 18
     @State private var bg: ReadBG = .paper
-    @State private var page = 3
 
     enum ReadBG: CaseIterable { case white, paper, gray, black
         var color: Color {
@@ -20,34 +32,15 @@ struct ReadingModeView: View {
         var text: Color { self == .black ? Color(hex: 0xCFCFCF) : Color(hex: 0x222222) }
     }
 
+    private var article: ReadableArticle { vm.readingArticle }
+
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Text("沉浸式阅读：让长文回归纯粹")
-                        .font(.system(size: fontSize + 8, weight: .bold))
-                        .foregroundStyle(bg.text)
-                    Text("来源 · example.com    阅读时长约 6 分钟")
-                        .font(.system(size: 13)).foregroundStyle(bg.text.opacity(0.5))
-                    ForEach(0..<8, id: \.self) { i in
-                        Text(Self.paragraph(i))
-                            .font(.system(size: fontSize))
-                            .lineSpacing(fontSize * 0.45)
-                            .foregroundStyle(bg.text)
-                    }
-                }
-                .padding(Theme.Spacing.xl)
+            if article.isEmpty {
+                emptyState
+            } else {
+                content
             }
-            Hairline()
-            HStack {
-                Button { } label: { Image(systemName: "chevron.left") }
-                Spacer()
-                Text("\(page) / 12").font(.system(size: 13)).foregroundStyle(bg.text.opacity(0.6))
-                Spacer()
-                Button { } label: { Image(systemName: "chevron.right") }
-            }
-            .foregroundStyle(bg.text)
-            .padding(.horizontal, Theme.Spacing.xl).frame(height: 44)
         }
         .background(bg.color.ignoresSafeArea())
         .navigationTitle("阅读模式").navigationBarTitleDisplayMode(.inline)
@@ -65,6 +58,46 @@ struct ReadingModeView: View {
         }
     }
 
+    /// 真实正文：标题 + 来源行 + 段落连续滚动（LazyVStack 惰性渲染长文）。
+    private var content: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 18) {
+                Text(article.title.isEmpty ? "（无标题）" : article.title)
+                    .font(.system(size: fontSize + 8, weight: .bold))
+                    .foregroundStyle(bg.text)
+                if !article.host.isEmpty {
+                    Text("来源 · \(article.host)    共 \(article.paragraphs.count) 段")
+                        .font(.system(size: 13)).foregroundStyle(bg.text.opacity(0.5))
+                }
+                ForEach(Array(article.paragraphs.enumerated()), id: \.offset) { _, para in
+                    Text(para)
+                        .font(.system(size: fontSize))
+                        .lineSpacing(fontSize * 0.45)
+                        .foregroundStyle(bg.text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(Theme.Spacing.xl)
+        }
+    }
+
+    /// 未抽取到正文时的占位（如主页进入或纯交互页面）。
+    private var emptyState: some View {
+        VStack(spacing: Theme.Spacing.l) {
+            Spacer()
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 44)).foregroundStyle(bg.text.opacity(0.4))
+            Text("未能提取到正文内容").font(.system(size: 16)).foregroundStyle(bg.text.opacity(0.7))
+            Text("该页面可能不是文章，或正文被脚本动态渲染。")
+                .font(.system(size: 13)).foregroundStyle(bg.text.opacity(0.5))
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// 电子书阅读器（EbookReaderView）复用的示例段落，保留以免破坏其编译。
     static func paragraph(_ i: Int) -> String {
         ["阅读模式会自动识别文章主体，剔除广告、侧边栏、评论与脚本干扰，只保留对阅读真正有价值的内容。",
          "你可以自由调整字体大小、字体类型、行距、段距与页面宽度，找到最舒适的阅读节奏。",

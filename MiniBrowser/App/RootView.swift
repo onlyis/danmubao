@@ -48,8 +48,10 @@ struct RootView: View {
                 withAnimation(.spring(response: 0.18, dampingFraction: 0.78)) { pagePop = 1 }
             }
 
-            // 底部固定工具栏（主页态不创建引擎）
-            BottomToolbar(engine: vm.isBrowsing ? vm.currentTab?.engine : nil)
+            // 底部固定工具栏（全屏模式下隐藏）
+            if !vm.isFullScreen {
+                BottomToolbar(engine: vm.isBrowsing ? vm.currentTab?.engine : nil)
+            }
         }
         .preferredColorScheme(vm.resolvedScheme)
         // 底部主菜单
@@ -66,6 +68,12 @@ struct RootView: View {
         }
         // 盾牌控制面板（网页快捷操作，可自定义）
         .sheet(isPresented: $vm.showControlPanel) { ControlPanelSheet() }
+        .sheet(isPresented: $vm.showQRGenerate) {
+            QRGenerateSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(Theme.Radius.sheet)
+        }
         // 网站设置面板（详细）
         .sheet(isPresented: $vm.showWebsiteSettings) {
             WebsiteSettingsSheet()
@@ -118,6 +126,20 @@ struct RootView: View {
         // 网页源码查看
         .sheet(item: $vm.sourcePreview) { preview in
             SourceCodeView(code: preview.code)
+        }
+        // 全屏退出浮动按钮（仅全屏模式显示）
+        .overlay(alignment: .bottomTrailing) {
+            if vm.isFullScreen {
+                Button { vm.toggleFullScreen() } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(.black.opacity(0.45), in: Circle())
+                }
+                .padding(.trailing, 16).padding(.bottom, 28)
+                .transition(.opacity).zIndex(30)
+            }
         }
         // 全局轻提示
         .overlay {

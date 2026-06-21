@@ -229,6 +229,130 @@ final class WebEngine: NSObject, ObservableObject {
         webView.evaluateJavaScript(js)
     }
 
+    // MARK: - 功能扩展（阅读正文/网页保存/视频循环/UA/清站数据）
+/// 抽取当前页面正文（自写简化 Readability，不引三方）：
+/// 优先在 article/main/[role=main] 内取，否则在常见容器候选里挑「可见文本量最大」者作正文根；
+/// 收集 h1-h3 与 p，去 script/style/nav 噪音、过滤过短(<20 字)与重复段落。回调在主线程。
+func fetchReadableArticle(_ completion: @escaping (ReadableArticle) -> Void) {
+    let js = """
+    (function(){
+      // 候选正文根：语义容器优先，否则在常见块级容器里按可见文本量挑最大的
+      function visText(el){ return (el && el.innerText ? el.innerText.trim().length : 0); }
+      var root = document.querySelector('article')
+              || document.querySelector('[role=main]')
+              || document.querySelector('main');
+      if (!root) {
+        var best = null, bestLen = 0;
+        var cands = document.querySelectorAll('article, main, section, div');
+        for (var i=0;i<cands.length;i++){
+          var c = cands[i];
+          // 跳过明显的非正文区域
+          var tag = (c.id+' '+c.className).toLowerCase();
+          if (/nav|menu|header|footer|sidebar|comment|aside|ad\\b|advert/.test(tag)) continue;
+          var len = visText(c);
+          if (len > bestLen){ bestLen = len; best = c; }
+        }
+        root = best || document.body;
+      }
+      if (!root) return { title: document.title || '', paragraphs: [] };
+      var nodes = root.querySelectorAll('h1, h2, h3, p, li, blockquote');
+      var seen = {}, out = [];
+      for (var j=0;j<nodes.length;j++){
+        var n = nodes[j];
+        // 跳过位于脚本/样式/导航内的节点
+        if (n.closest('script, style, nav, header, footer, aside')) continue;
+        var t = (n.innerText || '').replace(/\\s+/g, ' ').trim();
+        if (t.length < 20) continue;            // 过滤过短噪音
+        if (seen[t]) continue;                   // 去重
+        seen[t] = 1;
+        out.push(t);
+        if (out.length >= 400) break;            // 上限，避免超长页卡顿
+      }
+      return { title: document.title || '', host: location.host || '', paragraphs: out };
+    })();
+    """
+    webView.evaluateJavaScript(js) { result, _ in
+        let dict = result as? [String: Any]
+        let article = ReadableArticle(
+            title: (dict?["title"] as? String) ?? "",
+            host: (dict?["host"] as? String) ?? "",
+            paragraphs: (dict?["paragraphs"] as? [String]) ?? []
+        )
+        completion(article)
+    }
+}
+    /// 导出当前页为 WebArchive（完整离线网页存档，含资源）。
+    func exportWebArchive(_ completion: @escaping (Data?) -> Void) {
+        webView.createWebArchiveData { result in
+            completion((try? result.get()))
+        }
+    }
+
+    /// 整页长截图（含当前视口以外的内容）。
+    /// WKWebView 默认只渲染可见视口，takeSnapshot 也只截可见区；要截到整页，
+    /// 需临时把 webView 的 frame 撑到 scrollView.contentSize、并用覆盖整页的 rect 截图，
+    /// 截完立即还原 frame 与滚动位置（避免影响正常浏览）。
+    func fullPageSnapshot(_ completion: @escaping (UIImage?) -> Void) {
+        let scrollView = webView.scrollView
+        let fullSize = scrollView.contentSize
+        guard fullSize.width > 0, fullSize.height > 0 else { completion(nil); return }
+
+        let originalFrame = webView.frame
+        let originalOffset = scrollView.contentOffset
+
+        // 临时把 webView 铺成整页大小，让全部内容参与渲染。
+        webView.frame = CGRect(origin: .zero, size: fullSize)
+
+        let config = WKSnapshotConfiguration()
+        config.rect = CGRect(origin: .zero, size: fullSize)   // 覆盖整页，截到视口以外内容
+        config.afterScreenUpdates = true
+
+        // 等一次布局/渲染刷新后再截图，确保撑开后的内容已绘制。
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { completion(nil); return }
+            self.webView.takeSnapshot(with: config) { image, _ in
+                // 还原 frame 与滚动位置。
+                self.webView.frame = originalFrame
+                scrollView.contentOffset = originalOffset
+                completion(image)
+            }
+        }
+    }
+    /// 切换页面首个有效 <video> 的循环播放(单曲循环)。
+    /// 回传新的 loop 状态; 页面无 <video> 时回传 nil(供上层提示「未检测到视频」)。
+    func videoToggleLoop(completion: @escaping (Bool?) -> Void) {
+        let js = videoScript("v.loop=!v.loop;return v.loop;")
+        webView.evaluateJavaScript(js) { result, _ in
+            Task { @MainActor in completion(result as? Bool) }
+        }
+    }
+/// 设置自定义 User-Agent（nil 恢复系统默认）并重载生效。
+func setUserAgent(_ ua: String?) {
+    webView.customUserAgent = ua
+    // 标记桌面态以便切标签同步时不被 syncPageState 覆盖（Mac/Windows UA 视为桌面）。
+    desktopMode = (ua != nil && ua == desktopUA)
+    webView.reload()
+}
+
+/// 清除指定 host 的网站数据（Cookie / 缓存 / 本地存储等）。
+/// 使用本引擎自己的 websiteDataStore（无痕引擎为内存态隔离存储），异步完成后回主线程回调。
+func clearSiteData(host: String, completion: @escaping () -> Void) {
+    let store = webView.configuration.websiteDataStore
+    let types = WKWebsiteDataStore.allWebsiteDataTypes()
+    store.fetchDataRecords(ofTypes: types) { records in
+        // host 可能是裸域名（如 example.com），记录的 displayName 多为域名后缀；用包含匹配兜底子域。
+        let targets = records.filter { record in
+            let name = record.displayName
+            return host == name || host.hasSuffix(name) || name.hasSuffix(host)
+        }
+        let toRemove = targets.isEmpty ? records.filter { host.contains($0.displayName) } : targets
+        store.removeData(ofTypes: types, for: toRemove) {
+            // removeData 完成回调不保证在主线程：显式回主线程。
+            Task { @MainActor in completion() }
+        }
+    }
+}
+
     // MARK: - 输入归一化：网址 or 搜索关键词
     static func normalize(_ text: String, searchTemplate: String) -> URL {
         let trimmed = text.trimmingCharacters(in: .whitespaces)

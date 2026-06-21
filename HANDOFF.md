@@ -190,6 +190,16 @@ MiniBrowser/
 
 ## 5. 未完成 / 占位（明确告知用户的待办）
 
+> **2026-06-22 workflow 批量实现（6 功能, 已构建通过 + 阅读/二维码运行截图验证）**：
+> - **阅读模式正文抽取**：`WebEngine.fetchReadableArticle`（自写简化 Readability JS，选文本量最大容器、收集 h1-h3/p、去噪去重）→ `vm.openReadingMode()` 填 `vm.readingArticle` 后 route；`ReadingModeView` 重写渲染真实正文。菜单「阅读模式」接真。
+> - **网页保存增强**：`WebArchive`（`createWebArchiveData`）+ 整页长截图（`fullPageSnapshot` 临时撑开 frame 截全页）→ `vm.saveWebArchive()`/`saveFullScreenshot()` 落地下载。菜单「WebArchive」「网页长截图」接真。
+> - **二维码**：相册识别（`PHPicker` + `CIDetector`，`Features/QRCode/QRDecode.swift`）+ 生成当前页二维码（`QRGenerateSheet`，`vm.showQRGenerate`，RootView sheet）。菜单「识别图中码」「生成二维码」接真。
+> - **书签导入/导出**：`Models/BookmarkPortability.swift`（extension LibraryStore，Netscape HTML 格式 export/import + `UIDocumentPicker`），`BookmarksView` 两个按钮接真。
+> - **自动刷新 + 全屏 + 视频单曲循环**：`vm.autoRefreshSeconds`/`toggleAutoRefresh`(0/15/30/60 Timer)、`vm.isFullScreen`/`toggleFullScreen`(RootView 隐藏底部工具栏 + 浮动退出钮)、`WebEngine.videoToggleLoop`。菜单「自动刷新」「全屏模式」「单曲循环」接真。
+> - **网站设置真实化**：清除本站 Cookie(`WebEngine.clearSiteData` 按 host removeData)、UA 选择(`setUserAgent` 真实切换 + reload)、清本站广告规则(`refreshContentRules`)、站点权限重置。`WebsiteSettingsSheet` 重写接真（保留原夜间/桌面/广告/无图绑定）。
+> - 集成方式：workflow 6 agent 并行产出结构化实现，主循环把独占文件落盘、共享文件(BrowserViewModel/WebEngine/RootView)追加片段并入。**排除**（需外部依赖/决策）：翻译 API、rar/7z、真实 AirPlay/DLNA、默认浏览器。
+
+
 - **无图模式**：✅ 已真实化，做成内容规则插件 `noimage.block`（拦截 image 资源 + `css-display-none` 隐藏 img/picture）。`vm.isNoImageMode` 派生镜像该插件、`toggleNoImage()` 驱动；切换后内容规则重编译完成会 `refreshContentRules(reload:)` 重载当前页立即生效（广告拦截切换同此机制）。
 - **插件体系 / 插件市场**：✅ 已搭框架（`Models/Plugin.swift` 内置目录 + `Models/PluginStore.swift` 状态持久化/引擎集成 + `Features/Plugins/PluginMarketView.swift`）。两类插件：`contentRule`（编译为 `WKContentRuleList`）与 `userScript`（复用 `UserScriptStore.wrap`）。`WebEngine.init` 注入。入口：设置 → 功能 → 插件市场（已取代原「广告拦截」单独入口）。**广告拦截现为插件**（`adblock.basic`，真实 `WKContentRuleList`，默认安装启用）。注意：① 规则编译是**异步**的，仅对之后新建标签生效；② WKContentRuleList 仅支持受限正则子集（交替组等会编译失败），失败只记录并跳过、不崩溃；③ 目录在代码内，仅安装/启用状态持久化到 `plugins.json`。后续可扩展：把更多内置功能收编为插件、接远程目录。
 - **iCloud 同步**：代码已实现（`Models/CloudSync.swift` + `LibraryStore.persist/applyRemote`，`NSUbiquitousKeyValueStore`，含防回写守卫与 last-writer-wins），但 **entitlement 已暂时从 `project.yml` 移除**（个人 Team 真机签名过不去）。无 entitlement 时 CloudSync **静默降级**、不影响本地。恢复办法：把 `project.yml` 注释里的 `entitlements` 段加回 + 真机勾选 iCloud → Key-value storage。
