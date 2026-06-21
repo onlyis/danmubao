@@ -253,13 +253,14 @@ private struct SearchSuggestionList: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    /// 搜索历史 chips：左侧清空按钮 + 横向滚动的可点 chip（长按删单条）
+    /// 搜索历史 chips：左侧清空按钮 + 自动换行的可点 chip（长按删单条）
     private var chipsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Button { vm.clearSearchHistory() } label: {
-                    Image(systemName: "trash").font(.system(size: 15)).foregroundStyle(Theme.Colors.secondaryText)
-                }
+        HStack(alignment: .top, spacing: 8) {
+            Button { vm.clearSearchHistory() } label: {
+                Image(systemName: "trash").font(.system(size: 15)).foregroundStyle(Theme.Colors.secondaryText)
+                    .frame(width: 28, height: 28)
+            }
+            FlowLayout(spacing: 8) {
                 ForEach(vm.searchHistory, id: \.self) { q in
                     Button { onPick(q) } label: {
                         Text(q).font(.system(size: 13)).foregroundStyle(Theme.Colors.primaryText)
@@ -272,7 +273,34 @@ private struct SearchSuggestionList: View {
                     }
                 }
             }
-            .padding(.vertical, 2)
+        }
+    }
+}
+
+/// 简单流式布局：子视图自动换行排列。
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        for sv in subviews {
+            let size = sv.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 { x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return CGSize(width: maxWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for sv in subviews {
+            let size = sv.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX { x = bounds.minX; y += rowHeight + spacing; rowHeight = 0 }
+            sv.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
         }
     }
 }

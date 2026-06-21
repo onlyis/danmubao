@@ -8,11 +8,13 @@ struct TabsView: View {
     private let columns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
 
     private var activeTabs: [Tab] { vm.activeTabs }
+    /// 标签管理深灰底（参考 Alook/Safari），区别于主页白底
+    private var backdrop: Color { vm.isIncognito ? .black : Color(hex: 0x2C2C2E) }
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            Hairline()
+            Divider().overlay(Color.white.opacity(0.08))
 
             ScrollView {
                 if activeTabs.isEmpty {
@@ -23,17 +25,21 @@ struct TabsView: View {
                             TabCard(tab: tab,
                                     isCurrent: tab.id == vm.currentTabID,
                                     open: { vm.select(tab); dismiss() },
-                                    close: { vm.close(tab) })
+                                    close: { withAnimation(.easeOut(duration: 0.2)) { vm.close(tab) } })
+                                // 新建标签从左下角弹出
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.2, anchor: .bottomLeading).combined(with: .opacity),
+                                    removal: .scale(scale: 0.4).combined(with: .opacity)))
                         }
                     }
                     .padding(Theme.Spacing.l)
                 }
             }
 
-            Hairline()
+            Divider().overlay(Color.white.opacity(0.08))
             bottomBar
         }
-        .background((vm.isIncognito ? Color.black : Theme.Colors.background).ignoresSafeArea())
+        .background(backdrop.ignoresSafeArea())
         .onAppear { vm.captureCurrentThumbnail() }
     }
 
@@ -43,10 +49,10 @@ struct TabsView: View {
             Spacer()
             Text("\(activeTabs.count) 个标签页")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(vm.isIncognito ? .white : Theme.Colors.primaryText)
+                .foregroundStyle(.white)
             Spacer()
-            Button(role: .destructive) { vm.closeAllActive() } label: {
-                Image(systemName: "trash").font(.system(size: 17))
+            Button { withAnimation(.easeOut(duration: 0.2)) { vm.closeAllActive() } } label: {
+                Image(systemName: "trash").font(.system(size: 17)).foregroundStyle(.white.opacity(0.9))
             }
             .frame(width: 44)
             .disabled(activeTabs.isEmpty)
@@ -59,17 +65,20 @@ struct TabsView: View {
     private var bottomBar: some View {
         HStack(spacing: 0) {
             Button {
-                Haptics.light(); vm.toggleIncognito()
+                Haptics.light(); withAnimation { vm.toggleIncognito() }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: vm.isIncognito ? "globe" : "eyeglasses")
                     Text(vm.isIncognito ? "普通浏览" : "无痕浏览")
                 }
                 .font(.system(size: 15))
-                .foregroundStyle(vm.isIncognito ? Color.white : Theme.Colors.primaryText)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
             }
-            Button { Haptics.light(); vm.newTab() } label: {
+            Button {
+                Haptics.light()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) { vm.newTab() }
+            } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 26, weight: .light))
                     .foregroundStyle(Theme.Colors.accent)

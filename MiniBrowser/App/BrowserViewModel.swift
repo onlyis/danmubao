@@ -436,7 +436,7 @@ final class BrowserViewModel: ObservableObject {
         if isIncognito { incognitoTabs.insert(tab, at: 0) } else { tabs.insert(tab, at: 0) }
         currentTabID = tab.id
         goHome()
-        showTabs = false
+        // 不强制关闭标签管理：在标签管理里新建时，新卡片会原地弹出动画显示
         scheduleTabPersist()
     }
 

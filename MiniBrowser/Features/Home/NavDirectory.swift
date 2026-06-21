@@ -58,36 +58,61 @@ enum NavCatalog {
     ]
 }
 
-/// 网址导航目录视图（首页第二屏）：分类 + 小图标网格。
+/// 网址导航目录视图（首页第二屏）：可展开分类——点击分类标题，下方展开/收起子网格。
 struct NavDirectoryView: View {
     @EnvironmentObject var vm: BrowserViewModel
     var lightText: Bool = false
+    @State private var expanded: Set<String> = ["常用"]   // 默认展开第一个
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 5)
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(spacing: 12) {
                 ForEach(NavCatalog.categories) { cat in
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(cat.title)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(lightText ? .white : Theme.Colors.primaryText)
-                            .padding(.horizontal, 4)
-                        LazyVGrid(columns: columns, spacing: 14) {
-                            ForEach(cat.sites) { site in
-                                Button { Haptics.light(); vm.open(url: site.url, title: site.name) } label: {
-                                    VStack(spacing: 5) {
-                                        SiteIcon(glyph: site.glyph, color: site.color, size: 46, corner: 12)
-                                        Text(site.name)
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(lightText ? .white.opacity(0.9) : Theme.Colors.secondaryText)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                .buttonStyle(PressableStyle())
+                    VStack(spacing: 0) {
+                        Button {
+                            Haptics.light()
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                if expanded.contains(cat.title) { expanded.remove(cat.title) }
+                                else { expanded.insert(cat.title) }
                             }
+                        } label: {
+                            HStack {
+                                Text(cat.title)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(Theme.Colors.primaryText)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Theme.Colors.tertiaryText)
+                                    .rotationEffect(.degrees(expanded.contains(cat.title) ? 0 : -90))
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(height: 46)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if expanded.contains(cat.title) {
+                            LazyVGrid(columns: columns, spacing: 14) {
+                                ForEach(cat.sites) { site in
+                                    Button { Haptics.light(); vm.open(url: site.url, title: site.name) } label: {
+                                        VStack(spacing: 5) {
+                                            SiteIcon(glyph: site.glyph, color: site.color, size: 44, corner: 12)
+                                            Text(site.name)
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(Theme.Colors.secondaryText)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    .buttonStyle(PressableStyle())
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 14)
                         }
                     }
+                    .background(Theme.Colors.card, in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
                 }
                 Spacer(minLength: 80)
             }
