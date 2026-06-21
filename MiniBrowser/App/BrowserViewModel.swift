@@ -9,7 +9,8 @@ final class BrowserViewModel: ObservableObject {
     /// 当前是否处于网页浏览态（false = 主页 / 新标签页）
     @Published var isBrowsing: Bool = false
     @Published var isIncognito: Bool = false
-    @Published var isNightMode: Bool = false
+    /// 网页夜间模式：**仅作用于网页内容**（注入反色 CSS），不影响 App 自身外观（外观由 `appearanceMode` 决定）。持久化。
+    @Published var isNightMode: Bool = false { didSet { DiskStore.save(isNightMode, to: "night.json") } }
     /// 无图模式：派生自无图插件是否启用（同广告拦截，单一真相源 = PluginStore）。
     @Published private(set) var isNoImageMode: Bool = false
     /// 广告拦截状态：派生自广告类插件是否启用（单一真相源 = PluginStore）。
@@ -28,11 +29,8 @@ final class BrowserViewModel: ObservableObject {
         var scheme: ColorScheme? { self == .light ? .light : (self == .dark ? .dark : nil) }
     }
 
-    /// 最终强制的配色（仅夜间始终深色；无痕不影响页面深浅）
-    var resolvedScheme: ColorScheme? {
-        if isNightMode { return .dark }
-        return appearanceMode.scheme
-    }
+    /// App 自身配色：只由外观模式决定。网页夜间模式不再强制整个 App 变深色（那会劫持主页/设置/菜单）。
+    var resolvedScheme: ColorScheme? { appearanceMode.scheme }
     /// 当前默认搜索引擎（持久化）。`searchTemplate` 由它派生，供 WebEngine.normalize 使用。
     @Published var searchEngine: SearchEngine = SearchEngine.builtIn[0] {
         didSet { DiskStore.save(searchEngine, to: "search_engine.json") }
@@ -93,6 +91,7 @@ final class BrowserViewModel: ObservableObject {
     @Published var showMenu = false
     @Published var showTabs = false
     @Published var showWebsiteSettings = false
+    @Published var showControlPanel = false
     @Published var showSearch = false
     @Published var showVideoFloat = false
     @Published var showDownloadConfirm = false
@@ -122,11 +121,22 @@ final class BrowserViewModel: ObservableObject {
     }
     /// 书签 + 历史拆到独立存储层（见 LibraryStore）
     let library = LibraryStore()
+    /// 下载管理器引用（App 启动时注入）。供长按链接「下载」回调使用，
+    /// 使该回调能随每个被激活的引擎统一绑定（见 `bindActiveEngine`），而非只挂在某一个引擎上。
+    weak var downloadManager: DownloadManager?
 
     // MARK: - 标签页（每个标签独立引擎）
     @Published var tabs: [Tab] = SampleData.makeTabs()
     @Published var incognitoTabs: [Tab] = []
+    /// 当前激活模式的当前标签 id（视图据此高亮/取 currentTab）。
     @Published var currentTabID: UUID?
+    /// 两个模式各自记住自己的当前标签，互相切换时恢复，而不是每次跳回第一个。
+    /// 非激活模式的值存这里；激活模式的值即 `currentTabID`。
+    private var normalCurrentID: UUID?
+    private var incognitoCurrentID: UUID?
+    /// 普通 / 无痕模式各自「当前标签」的统一读取（无论当前激活哪个模式）。
+    private var savedNormalID: UUID? { isIncognito ? normalCurrentID : currentTabID }
+    private var savedIncognitoID: UUID? { isIncognito ? currentTabID : incognitoCurrentID }
 
     /// id → Tab 索引，保证海量标签下 currentTab 查找为 O(1)（避免每帧线性扫描）。
     private var tabIndex: [UUID: Tab] = [:]
@@ -175,6 +185,19 @@ final class BrowserViewModel: ObservableObject {
     func moveToolbarItems(from: IndexSet, to: Int) {
         toolbarItems.move(fromOffsets: from, toOffset: to)
     }
+
+    /// 底部主菜单的功能项（**分页**，可左右滑动；每页可长按编辑/删除/拖动/添加，持久化）。目录见 `MenuCatalog`。
+    @Published var menuItems: [[String]] = MenuCatalog.defaultPages {
+        didSet { DiskStore.save(menuItems, to: "menu.json") }
+    }
+    /// 盾牌控制面板的快捷功能项顺序（网页相关操作，可编辑，持久化）。目录见 `ControlPanelCatalog`。
+    @Published var panelItems: [String] = ControlPanelCatalog.defaultTitles {
+        didSet { DiskStore.save(panelItems, to: "panel.json") }
+    }
+
+    /// 当前页面是否检测到可播放视频（由 `WebEngine.detectVideo` 在加载完成/按需刷新）。
+    /// 决定是否显示「悬浮播放」入口——没有视频就不显示，避免「有菜单没视频」。
+    @Published var hasVideo: Bool = false
 
     /// 看图模式：当前页面提取出的图片地址
     @Published var pageImages: [String] = []
@@ -259,19 +282,27 @@ final class BrowserViewModel: ObservableObject {
         if let sh = DiskStore.load([String].self, from: "search_history.json") { searchHistory = sh }
         if let ne = DiskStore.load([String].self, from: "nav_expanded.json") { navExpanded = Set(ne) }
         if let ql = DiskStore.load([QuickLink].self, from: "quicklinks.json") { quickLinks = ql }
+        if let n = DiskStore.load(Bool.self, from: "night.json") { isNightMode = n }
+        if let m = DiskStore.load([[String]].self, from: "menu.json"), !m.isEmpty { menuItems = m }
+        if let pn = DiskStore.load([String].self, from: "panel.json") { panelItems = pn }
         // 不变式校正：gesture ∈ toolbarItems ⟺ 放置方式为工具栏（防旧数据不一致导致空槽）
         let gestureInToolbar = toolbarItems.contains(.gesture)
         if (gesture.placement == .toolbar) != gestureInToolbar {
             gesture.placement = gestureInToolbar ? .toolbar : .floating
         }
-        // 恢复上次的标签（无痕标签不持久化）。属性观察器在 init 中不触发，恢复不会回写。
-        if let state = DiskStore.load(TabsState.self, from: "tabs.json"), !state.tabs.isEmpty {
-            tabs = state.tabs.map(Tab.init)
-            currentTabID = state.currentID ?? tabs.first?.id
+        // 恢复上次的标签（普通 + 无痕都持久化）。属性观察器在 init 中不触发，恢复不会回写。
+        if let state = DiskStore.load(TabsState.self, from: "tabs.json"),
+           !(state.tabs.isEmpty && state.incognitoTabs.isEmpty) {
+            if !state.tabs.isEmpty { tabs = state.tabs.map { Tab($0) } }
+            incognitoTabs = state.incognitoTabs.map { Tab($0, isIncognito: true) }
+            normalCurrentID = state.currentID ?? tabs.first?.id
+            incognitoCurrentID = state.incognitoCurrentID ?? incognitoTabs.first?.id
         } else {
-            currentTabID = tabs.first?.id
+            normalCurrentID = tabs.first?.id
         }
+        currentTabID = normalCurrentID   // 启动进入普通模式
         for t in tabs { tabIndex[t.id] = t }
+        for t in incognitoTabs { tabIndex[t.id] = t }
 
         // 广告拦截 / 无图开关镜像对应插件的启用状态（PluginStore 为单一真相源）。
         // assign(to:) 不强引用 self，订阅时即用当前值同步一次。
@@ -316,9 +347,8 @@ final class BrowserViewModel: ObservableObject {
 
     // MARK: - 标签持久化（合并写，避免连续增删反复整表编码）
     private var tabPersistWork: DispatchWorkItem?
-    /// 普通标签结构/地址变化后调用：延迟合并为一次落盘。
+    /// 标签结构/地址变化后调用：延迟合并为一次落盘（普通 + 无痕都持久化）。
     func scheduleTabPersist() {
-        guard !isIncognito else { return }   // 无痕态变化不持久化
         tabPersistWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.persistTabsNow() }
         tabPersistWork = work
@@ -326,7 +356,10 @@ final class BrowserViewModel: ObservableObject {
     }
     /// 立即落盘（供 App 进入后台时调用，捕获最新标题/地址）。
     func persistTabsNow() {
-        DiskStore.save(TabsState(tabs: tabs.map(\.snapshot), currentID: currentTabID), to: "tabs.json")
+        // 快照在主线程取（Tab 是 @MainActor），编码+写盘交给后台，避免海量标签整表编码卡主线程。
+        let state = TabsState(tabs: tabs.map(\.snapshot), currentID: savedNormalID,
+                              incognitoTabs: incognitoTabs.map(\.snapshot), incognitoCurrentID: savedIncognitoID)
+        DiskStore.saveAsync(state, to: "tabs.json")
     }
 
     // MARK: - 手势
@@ -371,6 +404,114 @@ final class BrowserViewModel: ObservableObject {
         showToast(action.title, symbol: action.symbol)
     }
 
+    // MARK: - 统一功能分发（菜单 + 控制面板按标题共用）
+    /// 某功能当前是否处于「开」状态（用于开关型功能的高亮/小开关）。
+    func actionIsOn(_ title: String) -> Bool {
+        switch title {
+        case "无痕模式": return isIncognito
+        case "夜间模式": return isNightMode
+        case "无图模式": return isNoImageMode
+        case "广告拦截": return isAdBlockOn
+        case "电脑版", "桌面版网站": return isDesktopMode
+        default: return false
+        }
+    }
+
+    /// 执行某功能（按标题）。返回 true 表示宿主弹层（菜单/控制面板）应关闭；开关型停留返回 false。
+    @discardableResult
+    func performMenuAction(_ title: String) -> Bool {
+        switch title {
+        // 路由页面
+        case "设置": route = .settings
+        case "书签": route = .bookmarks
+        case "历史": route = .history
+        case "下载": route = .downloads
+        case "文件": route = .files
+        case "阅读模式": route = .reading
+        case "漫画模式": route = .comic
+        case "网页翻译": route = .translate
+        case "工具箱": route = .toolbox
+        case "开发者工具": route = .devtools
+        case "Cookie管理": route = .cookies
+        case "二维码", "扫码": route = .qrScanner
+        case "JavaScript扩展", "JavaScript 脚本": route = .jsExtensions
+        case "搜索引擎": route = .searchEngine
+        case "电子书": route = .reader
+        case "看图模式", "查看图片": openImageMode()
+        // 页面操作（真实）
+        case "刷新": guardEngine { $0.reload() }
+        case "后退": back()
+        case "前进": forward()
+        case "查看源码": viewSource()
+        case "保存PDF": saveCurrentPDF()
+        case "保存HTML": saveCurrentHTML()
+        case "打印": printCurrent()
+        case "页面搜索", "站内搜索", "页面查找": findInPage()
+        case "复制网址":
+            guard !currentURL.isEmpty else { showToast("无可复制的网址", symbol: "exclamationmark.circle"); return false }
+            UIPasteboard.general.string = currentURL
+            showToast("已复制网址", symbol: "doc.on.doc")
+        case "分享": shareCurrentPage()
+        case "滚动到顶": guardEngine { $0.webView.evaluateJavaScript("window.scrollTo({top:0,behavior:'smooth'})") }
+        case "滚动到底": guardEngine { $0.webView.evaluateJavaScript("window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})") }
+        case "下载资源", "下载当前资源": showDownloadConfirm = true
+        case "视频悬浮", "画中画": return openVideoFloat()
+        case "标记广告": showMarkAds = true
+        case "网站设置": showWebsiteSettings = true
+        case "主页": goHome()
+        // 开关型（停留，不关闭弹层）
+        case "无痕模式": toggleIncognito(); return false
+        case "夜间模式": isNightMode.toggle(); return false
+        case "无图模式": toggleNoImage(); return false
+        case "广告拦截": toggleAdBlock(); return false
+        case "电脑版", "桌面版网站": isDesktopMode.toggle(); return false
+        default:
+            showToast("「\(title)」暂未实现", symbol: "hammer")
+            return false
+        }
+        return true
+    }
+
+    /// 需要当前网页的操作的统一守卫：无网页时提示。
+    private func guardEngine(_ body: (WebEngine) -> Void) {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        body(engine)
+    }
+
+    // MARK: - 分享当前页
+    struct ShareItem: Identifiable { let id = UUID(); let url: URL }
+    @Published var shareItem: ShareItem?
+    func shareCurrentPage() {
+        let s = currentURL
+        guard !s.isEmpty else { showToast("无可分享的页面", symbol: "exclamationmark.circle"); return }
+        let str = s.hasPrefix("http") ? s : "https://" + s
+        guard let u = URL(string: str) else { showToast("无可分享的页面", symbol: "exclamationmark.circle"); return }
+        shareItem = ShareItem(url: u)
+    }
+
+    // MARK: - 视频悬浮（先真实检测页面是否有视频）
+    /// 打开悬浮播放器前先检测页面视频；无视频则提示，不弹空壳播放器。
+    @discardableResult
+    func openVideoFloat() -> Bool {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return false }
+        engine.detectVideo { [weak self] found in
+            guard let self else { return }
+            self.hasVideo = found
+            if found { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { self.showVideoFloat = true } }
+            else { self.showToast("未检测到视频", symbol: "play.slash") }
+        }
+        return true
+    }
+
+    /// 刷新「当前标签是否有视频」（切标签/加载完成时调用），驱动悬浮入口的显隐。
+    func refreshVideoPresence(for tab: Tab) {
+        guard tab.hasEngine, tab.id == currentTabID else { return }
+        tab.engine.detectVideo { [weak self, weak tab] found in
+            guard let self, let tab, tab.id == self.currentTabID else { return }
+            self.hasVideo = found
+        }
+    }
+
     // MARK: - 书签（委托 LibraryStore，附带 Toast 反馈）
     func addBookmark(title: String, url: String) {
         switch library.addBookmark(title: title, url: url) {
@@ -408,6 +549,7 @@ final class BrowserViewModel: ObservableObject {
         if let t = currentTab {
             t.load(url, searchTemplate: searchTemplate)   // 本页面打开；加载遮罩避免看到旧页面
             enginePool.touch(t, current: t)
+            bindActiveEngine(t)   // 跟随全局夜间/桌面开关
         }
         isBrowsing = true
         if !isIncognito { library.recordHistory(title: title ?? url, url: url) }
@@ -416,6 +558,33 @@ final class BrowserViewModel: ObservableObject {
 
     func goHome() {
         isBrowsing = false
+        hasVideo = false   // 主页无网页视频，收起悬浮入口
+    }
+
+    /// 激活某标签引擎时统一绑定：①同步全局页面开关（夜间/桌面）②加载完成回填历史标题
+    /// ③长按链接的下载 / 后台打开回调。标签激活/加载后调用——切标签、新标签都重新绑定，
+    /// 避免状态与回调只挂在最初那个引擎上（切标签后失效）。
+    private func bindActiveEngine(_ tab: Tab?) {
+        guard let tab, !tab.isHome else { return }
+        // 主动取 engine：被 LRU 回收的标签在此惰性重建并恢复会话，
+        // 保证「夜间/桌面同步 + 各回调」一定绑到将要显示的这个引擎上（不会因尚未创建而漏绑）。
+        let engine = tab.engine
+        engine.syncPageState(night: isNightMode, desktop: isDesktopMode)
+        refreshVideoPresence(for: tab)   // 切到/加载该标签时检测是否有视频
+        engine.onDidFinish = { [weak self, weak tab] in
+            guard let self, let tab else { return }
+            self.refreshVideoPresence(for: tab)   // 加载完成后重检测视频（驱动悬浮入口显隐）
+            guard !tab.isIncognito, let pending = tab.pendingHistoryURL else { return }
+            let title = tab.engine.title
+            guard !title.isEmpty else { return }
+            tab.pendingHistoryURL = nil
+            self.library.updateHistoryTitle(url: pending, title: title)
+        }
+        engine.onRequestDownload = { [weak self] url in
+            self?.downloadManager?.start(urlString: url.absoluteString)
+            self?.showToast("开始下载…", symbol: "arrow.down.circle")
+        }
+        engine.onOpenInBackground = { [weak self] url in self?.openInBackground(url: url.absoluteString) }
     }
 
     /// 在后台新标签打开链接（不切换当前标签）
@@ -426,6 +595,7 @@ final class BrowserViewModel: ObservableObject {
         tabIndex[tab.id] = tab
         if isIncognito { incognitoTabs.append(tab) } else { tabs.append(tab) }   // 末尾
         tab.load(u, searchTemplate: searchTemplate)
+        bindActiveEngine(tab)   // 后台标签也跟随全局夜间/桌面开关
         if !isIncognito { library.recordHistory(title: u, url: u) }
         bgOpenTrigger += 1   // 小动画替代提示
         scheduleTabPersist()
@@ -469,6 +639,7 @@ final class BrowserViewModel: ObservableObject {
         } else {
             tab.activateIfNeeded(searchTemplate: searchTemplate)
             enginePool.touch(tab, current: tab)
+            bindActiveEngine(tab)   // 切到该标签时对齐全局夜间/桌面开关
             isBrowsing = true
         }
         showTabs = false
@@ -522,15 +693,21 @@ final class BrowserViewModel: ObservableObject {
     }
 
     func toggleIncognito() {
+        // 切换前先把当前模式的当前标签存进对应槽，切换后恢复目标模式上次的当前标签（互不干扰）。
+        if isIncognito { incognitoCurrentID = currentTabID } else { normalCurrentID = currentTabID }
         withAnimation { isIncognito.toggle() }
-        currentTabID = activeTabs.first?.id
+        let restored = isIncognito ? incognitoCurrentID : normalCurrentID
+        currentTabID = restored ?? activeTabs.first?.id
         if let t = currentTab, !t.isHome {
             t.activateIfNeeded(searchTemplate: searchTemplate)
             enginePool.touch(t, current: t)
+            bindActiveEngine(t)
             isBrowsing = true
         } else {
             isBrowsing = false
+            hasVideo = false
         }
+        scheduleTabPersist()
     }
 }
 

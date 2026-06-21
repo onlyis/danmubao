@@ -12,7 +12,7 @@ final class Tab: ObservableObject, Identifiable {
     private var savedSession: Data?
     var engine: WebEngine {
         if let e = _engine { return e }
-        let e = WebEngine()
+        let e = WebEngine(incognito: isIncognito)   // 无痕标签用隔离的临时数据存储
         if let s = savedSession { e.sessionState = s; savedSession = nil }
         _engine = e
         return e
@@ -40,6 +40,9 @@ final class Tab: ObservableObject, Identifiable {
     var tint: Color { Color(hex: tintHex) }
     /// 引擎是否已发起过加载
     private(set) var didLoad = false
+    /// 待回填标题的历史地址：首次加载记历史时用地址占位，页面加载完后用真实标题回填一次。
+    /// 仅首次加载置位、回填后清空，避免页内跳转把别的页面标题写回原条目。
+    var pendingHistoryURL: String?
 
     init(id: UUID = UUID(),
          isHome: Bool = true,
@@ -60,9 +63,9 @@ final class Tab: ObservableObject, Identifiable {
         TabSnapshot(id: id, isHome: isHome, title: displayTitle, url: displayURL, tintHex: tintHex)
     }
 
-    /// 从快照恢复（非无痕标签）。didLoad 为 false，选中时再惰性加载，启动不建引擎。
-    convenience init(_ s: TabSnapshot) {
-        self.init(id: s.id, isHome: s.isHome, isIncognito: false,
+    /// 从快照恢复。didLoad 为 false，选中时再惰性加载，启动不建引擎。
+    convenience init(_ s: TabSnapshot, isIncognito: Bool = false) {
+        self.init(id: s.id, isHome: s.isHome, isIncognito: isIncognito,
                   placeholderTitle: s.title, placeholderURL: s.url, tintHex: s.tintHex)
     }
 
@@ -80,6 +83,7 @@ final class Tab: ObservableObject, Identifiable {
         isHome = false
         placeholderTitle = text
         placeholderURL = text
+        pendingHistoryURL = text
         didLoad = true
         engine.submit(text, searchTemplate: searchTemplate)
     }
@@ -94,13 +98,14 @@ final class Tab: ObservableObject, Identifiable {
     func activateIfNeeded(searchTemplate: String) {
         guard !isHome, !didLoad, !placeholderURL.isEmpty else { return }
         didLoad = true
+        pendingHistoryURL = placeholderURL
         engine.submit(placeholderURL, searchTemplate: searchTemplate)
     }
 }
 
 /// 标签持久化快照：仅存元信息（地址/标题/配色），不含会话状态——
 /// 海量标签时体积可控（每条约百字节）。恢复后选中再惰性加载。
-struct TabSnapshot: Codable {
+struct TabSnapshot: Codable, Sendable {
     var id: UUID
     var isHome: Bool
     var title: String
@@ -108,8 +113,11 @@ struct TabSnapshot: Codable {
     var tintHex: UInt
 }
 
-/// 持久化的标签集合（普通标签 + 当前选中 id；无痕标签不持久化）。
-struct TabsState: Codable {
+/// 持久化的标签集合：普通 + 无痕两组各自的快照与当前选中 id（两模式互不干扰、都能跨重启恢复）。
+/// 旧字段保留默认值以兼容历史 `tabs.json`。
+struct TabsState: Codable, Sendable {
     var tabs: [TabSnapshot]
     var currentID: UUID?
+    var incognitoTabs: [TabSnapshot] = []
+    var incognitoCurrentID: UUID? = nil
 }

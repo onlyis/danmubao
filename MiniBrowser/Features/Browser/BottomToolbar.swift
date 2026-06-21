@@ -154,6 +154,8 @@ private struct ToolbarButton: View {
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
             guard let longPress else { return }
             longPressed = true; Haptics.soft(); longPress()
+            // 兜底复位：若长按后那次 tap 未触发（手指挪开等），避免标志残留吃掉下一次正常点击。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { longPressed = false }
         })
     }
 }
@@ -188,6 +190,7 @@ private struct TabsButton: View {
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
             guard let longPress else { return }
             longPressed = true; Haptics.soft(); longPress()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { longPressed = false }
         })
         .onChange(of: pulse) { _, _ in
             scale = 1.35

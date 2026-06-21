@@ -11,6 +11,7 @@ struct BrowserApp: App {
             RootView()
                 .environmentObject(vm)
                 .environmentObject(vm.library)
+                .onAppear { vm.downloadManager = downloads }   // 供 bindActiveEngine 统一绑定下载回调
                 .environmentObject(vm.toasts)
                 .environmentObject(UserScriptStore.shared)
                 .environmentObject(PluginStore.shared)

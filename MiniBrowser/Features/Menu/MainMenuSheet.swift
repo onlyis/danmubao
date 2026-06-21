@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// 底部主菜单：顶部网页快捷操作行 + 可左右滑动分页的功能宫格 + 底部状态行。
+/// 底部主菜单：顶部标题头 + 可编辑功能宫格（长按删除/拖动/添加）+ 底部状态行。
 struct MainMenuSheet: View {
     @EnvironmentObject var vm: BrowserViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var editing = false
     @State private var page = 0
 
-    private let columns = Array(repeating: GridItem(.flexible()), count: 4)
+    /// 所有页已用标题的并集（用于「添加」时排除已存在的功能）。
+    private var usedTitles: [String] { vm.menuItems.flatMap { $0 } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,20 +16,43 @@ struct MainMenuSheet: View {
             Hairline().padding(.horizontal, Theme.Spacing.l)
 
             TabView(selection: $page) {
-                ScrollView { menuGrid(MenuCatalog.page1) }.tag(0)
-                ScrollView { menuGrid(MenuCatalog.page2) }.tag(1)
-                ScrollView { menuGrid(MenuCatalog.page3) }.tag(2)
+                ForEach(vm.menuItems.indices, id: \.self) { i in
+                    ScrollView {
+                        EditableActionGrid(
+                            titles: pageBinding(i),
+                            pool: MenuCatalog.all,
+                            usedTitles: usedTitles,
+                            isOn: { vm.actionIsOn($0) },
+                            perform: { if vm.performMenuAction($0) { dismiss() } },
+                            editing: $editing
+                        )
+                        .padding(.horizontal, Theme.Spacing.l)
+                        .padding(.top, Theme.Spacing.l)
+                        .padding(.bottom, 36)
+                    }
+                    .tag(i)
+                }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
             .frame(maxHeight: .infinity)
 
+            if editing {
+                Text("编辑的是当前页 · 长按拖动排序 · 点角标删除 · 翻页可改其它页")
+                    .font(.system(size: 11)).foregroundStyle(Theme.Colors.tertiaryText)
+                    .padding(.bottom, 4)
+            }
             statusBar
         }
         .padding(.top, Theme.Spacing.s)
         .background((vm.isIncognito ? Color(hex: 0x111114) : Theme.Colors.card).ignoresSafeArea())
     }
 
-    // 顶部装饰性标题头（盾牌 + 当前页 + 更多）
+    /// 手动构造对某一页的绑定（改某页 → 触发 vm.menuItems didSet 落盘）。
+    private func pageBinding(_ i: Int) -> Binding<[String]> {
+        Binding(get: { vm.menuItems[i] }, set: { vm.menuItems[i] = $0 })
+    }
+
+    // 顶部标题头（盾牌 + 当前页 + 编辑/设置）
     private var header: some View {
         HStack(spacing: Theme.Spacing.s) {
             Image(systemName: "shield.lefthalf.filled")
@@ -38,28 +63,22 @@ struct MainMenuSheet: View {
                 .foregroundStyle(Theme.Colors.primaryText)
                 .lineLimit(1)
             Spacer()
-            Button { dismiss(); vm.route = .settings } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Theme.Colors.secondaryText)
+            if editing {
+                Button { withAnimation(.easeOut(duration: 0.15)) { editing = false } } label: {
+                    Text("完成").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.Colors.accent)
+                }
+            } else {
+                Button { withAnimation(.easeOut(duration: 0.15)) { editing = true } } label: {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 18)).foregroundStyle(Theme.Colors.secondaryText)
+                }
+                Button { dismiss(); vm.route = .settings } label: {
+                    Image(systemName: "ellipsis.circle").font(.system(size: 20)).foregroundStyle(Theme.Colors.secondaryText)
+                }
             }
         }
         .padding(.horizontal, Theme.Spacing.l)
         .padding(.top, Theme.Spacing.s)
         .padding(.bottom, Theme.Spacing.m)
-    }
-
-    private func menuGrid(_ items: [MenuAction]) -> some View {
-        LazyVGrid(columns: columns, spacing: Theme.Spacing.xl) {
-            ForEach(items) { item in
-                MenuCell(item: item, isOn: toggleState(item)) {
-                    handle(item)
-                }
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.l)
-        .padding(.top, Theme.Spacing.l)
-        .padding(.bottom, 36)   // 给底部页码点留白，避免遮挡最后一行
     }
 
     private var statusBar: some View {
@@ -85,100 +104,9 @@ struct MainMenuSheet: View {
         return Theme.Colors.safe
     }
 
-    private func toggleState(_ item: MenuAction) -> Bool {
-        switch item.title {
-        case "无痕模式": return vm.isIncognito
-        case "夜间模式": return vm.isNightMode
-        case "无图模式": return vm.isNoImageMode
-        case "广告拦截": return vm.isAdBlockOn
-        case "电脑版": return vm.isDesktopMode
-        default: return false
-        }
-    }
-
-    private func handle(_ item: MenuAction) {
-        Haptics.light()
-        switch item.title {
-        case "设置": vm.route = .settings; dismiss()
-        case "书签": vm.route = .bookmarks; dismiss()
-        case "历史": vm.route = .history; dismiss()
-        case "下载": vm.route = .downloads; dismiss()
-        case "文件": vm.route = .files; dismiss()
-        case "阅读模式": vm.route = .reading; dismiss()
-        case "看图模式", "查看图片": vm.openImageMode(); dismiss()
-        case "漫画模式": vm.route = .comic; dismiss()
-        case "网页翻译": vm.route = .translate; dismiss()
-        case "工具箱": vm.route = .toolbox; dismiss()
-        case "开发者工具": vm.route = .devtools; dismiss()
-        case "Cookie管理": vm.route = .cookies; dismiss()
-        case "二维码": vm.route = .qrScanner; dismiss()
-        case "JavaScript扩展": vm.route = .jsExtensions; dismiss()
-        case "搜索引擎": vm.route = .searchEngine; dismiss()
-        case "查看源码": vm.viewSource(); dismiss()
-        case "保存PDF": vm.saveCurrentPDF(); dismiss()
-        case "保存HTML": vm.saveCurrentHTML(); dismiss()
-        case "打印": vm.printCurrent(); dismiss()
-        case "页面搜索", "站内搜索": vm.findInPage(); dismiss()
-        case "电子书": vm.route = .reader; dismiss()
-        case "下载资源", "下载当前资源": vm.showDownloadConfirm = true; dismiss()
-        case "视频悬浮": vm.showVideoFloat = true; dismiss()
-        case "无痕模式": vm.toggleIncognito()
-        case "夜间模式": withAnimation { vm.isNightMode.toggle() }
-        case "无图模式": vm.toggleNoImage()
-        case "广告拦截": vm.toggleAdBlock()
-        case "标记广告": vm.showMarkAds = true; dismiss()
-        case "电脑版": vm.isDesktopMode.toggle()
-        case "网站设置": vm.showWebsiteSettings = true; dismiss()
-        case "主页": vm.goHome(); dismiss()
-        default: dismiss()
-        }
-    }
 }
 
-private struct MenuCell: View {
-    let item: MenuAction
-    var isOn: Bool
-    var action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 7) {
-                Image(systemName: item.symbol)
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(isOn ? .white : Theme.Colors.primaryText)
-                    .frame(width: 50, height: 50)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(isOn ? Theme.Colors.accent : Theme.Colors.groupedBackground)
-                    )
-                    .overlay(alignment: .bottomTrailing) {
-                        // 开关型功能：在图标右下角画一个迷你开关，直观显示状态
-                        if item.isToggle {
-                            Capsule()
-                                .fill(isOn ? Theme.Colors.safe : Color.gray.opacity(0.45))
-                                .frame(width: 22, height: 13)
-                                .overlay(
-                                    Circle().fill(.white).frame(width: 10, height: 10)
-                                        .offset(x: isOn ? 4.5 : -4.5)
-                                )
-                                .overlay(Capsule().strokeBorder(Theme.Colors.card, lineWidth: 1.5))
-                                .offset(x: 5, y: 5)
-                        }
-                    }
-                Text(item.title)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Colors.secondaryText)
-                    .lineLimit(1)
-            }
-        }
-        .buttonStyle(PressableStyle())
-        .contextMenu {
-            Button { } label: { Label("设为长按快捷操作", systemImage: "hand.tap") }
-            Button { } label: { Label("编辑菜单顺序", systemImage: "arrow.up.arrow.down") }
-        }
-    }
-}
-
-/// 菜单功能目录（分三屏）
+/// 菜单功能目录（分三屏，作为「可添加功能」的完整池）
 enum MenuCatalog {
     static let page1: [MenuAction] = [
         .init(title: "设置", symbol: "gearshape"),
@@ -248,4 +176,13 @@ enum MenuCatalog {
         .init(title: "iCloud同步", symbol: "icloud"),
         .init(title: "Face ID锁", symbol: "faceid"),
     ]
+
+    /// 去重后的完整目录（按页顺序），作为「添加功能」的池与标题→功能查表。
+    static let all: [MenuAction] = {
+        var seen = Set<String>(); var out: [MenuAction] = []
+        for a in page1 + page2 + page3 where !seen.contains(a.title) { seen.insert(a.title); out.append(a) }
+        return out
+    }()
+    /// 默认分页布局（首次启动 / 未自定义时）：三页，与原 60 项一致。
+    static let defaultPages: [[String]] = [page1, page2, page3].map { $0.map(\.title) }
 }

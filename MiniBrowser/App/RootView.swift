@@ -7,9 +7,8 @@ struct RootView: View {
     @Environment(\.colorScheme) private var systemScheme
     @State private var pagePop: CGFloat = 1
 
-    /// 当前是否处于深色（用于 OLED 纯黑判断）。无痕不再影响深浅，深浅交给夜间模式控制。
+    /// 当前是否处于深色（用于 OLED 纯黑判断）。只看外观模式——网页夜间模式不影响 App 外观。
     private var isDark: Bool {
-        if vm.isNightMode { return true }
         switch vm.appearanceMode {
         case .light: return false
         case .dark: return true
@@ -34,8 +33,10 @@ struct RootView: View {
 
             // 主体内容
             Group {
-                if vm.isBrowsing, let engine = vm.currentTab?.engine {
-                    BrowserView(engine: engine)
+                if vm.isBrowsing, let tab = vm.currentTab {
+                    // .id(tab.id)：切标签/切无痕时，让 SwiftUI 重新挂载对应引擎的 WKWebView，
+                    // 否则 UIViewRepresentable 会复用上一个标签的 webView，导致内容不切换（停在旧页）。
+                    BrowserView(engine: tab.engine).id(tab.id)
                 } else {
                     HomeView()
                 }
@@ -63,12 +64,19 @@ struct RootView: View {
         .overlay {
             if vm.showTabs { TabsView().zIndex(20) }
         }
-        // 网站设置面板
+        // 盾牌控制面板（网页快捷操作，可自定义）
+        .sheet(isPresented: $vm.showControlPanel) { ControlPanelSheet() }
+        // 网站设置面板（详细）
         .sheet(isPresented: $vm.showWebsiteSettings) {
             WebsiteSettingsSheet()
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
+        }
+        // 系统分享面板
+        .sheet(item: $vm.shareItem) { item in
+            ActivityView(items: [item.url])
+                .presentationDetents([.medium, .large])
         }
         // 搜索输入态：统一的内联搜索（主页/浏览态共用），覆盖层淡入
         .overlay {

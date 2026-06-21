@@ -16,9 +16,20 @@ struct FilesView: View {
     @State private var newFolderName = ""
 
     private let categoryColumns = [GridItem(.flexible()), GridItem(.flexible())]
+    private let gridColumns = [GridItem(.adaptive(minimum: 96), spacing: Theme.Spacing.m)]
 
     private var filtered: [FileItem] {
         search.isEmpty ? files : files.filter { $0.name.localizedCaseInsensitiveContains(search) }
+    }
+
+    /// 把一个文件的操作打包，供列表行与网格格复用（DRY）。
+    private func actions(for file: FileItem) -> FileActions {
+        FileActions(
+            delete: { delete(file) },
+            compress: { compress(file) },
+            extract: { extract(file) },
+            rename: { renameText = file.name; renameTarget = file },
+            move: { moveTarget = file })
     }
 
     var body: some View {
@@ -36,14 +47,17 @@ struct FilesView: View {
             Section("下载目录 (\(files.count))") {
                 if filtered.isEmpty {
                     Text("暂无文件").font(.system(size: 14)).foregroundStyle(Theme.Colors.tertiaryText)
+                } else if isGrid {
+                    LazyVGrid(columns: gridColumns, spacing: Theme.Spacing.m) {
+                        ForEach(filtered) { file in
+                            FileGridCell(file: file, actions: actions(for: file))
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 } else {
                     ForEach(filtered) { file in
-                        FileRow(file: file,
-                                onDelete: { delete(file) },
-                                onCompress: { compress(file) },
-                                onExtract: { extract(file) },
-                                onRename: { renameText = file.name; renameTarget = file },
-                                onMove: { moveTarget = file })
+                        FileRow(file: file, actions: actions(for: file))
                     }
                 }
             }
@@ -172,15 +186,33 @@ private struct CategoryCard: View {
     }
 }
 
+/// 文件操作集合（删除/压缩/解压/重命名/移动），供列表行与网格格复用。
+struct FileActions {
+    var delete: () -> Void
+    var compress: () -> Void
+    var extract: () -> Void
+    var rename: () -> Void
+    var move: () -> Void
+}
+
+/// 文件的菜单项（行 Menu 与格 contextMenu 共用，含分享）。
+@ViewBuilder
+private func fileMenuContent(_ file: FileItem, _ a: FileActions) -> some View {
+    let url = DownloadManager.downloadsDirectory.appendingPathComponent(file.name)
+    let isZip = file.name.lowercased().hasSuffix(".zip")
+    if !file.isFolder { ShareLink(item: url) { Label("分享", systemImage: "square.and.arrow.up") } }
+    Button(action: a.rename) { Label("重命名", systemImage: "pencil") }
+    Button(action: a.move) { Label("移动", systemImage: "folder") }
+    if !file.isFolder {
+        if isZip { Button(action: a.extract) { Label("解压到此处", systemImage: "archivebox") } }
+        else { Button(action: a.compress) { Label("压缩为 zip", systemImage: "doc.zipper") } }
+    }
+    Button(role: .destructive, action: a.delete) { Label("删除", systemImage: "trash") }
+}
+
 private struct FileRow: View {
     let file: FileItem
-    var onDelete: () -> Void
-    var onCompress: () -> Void
-    var onExtract: () -> Void
-    var onRename: () -> Void
-    var onMove: () -> Void
-
-    private var fileURL: URL { DownloadManager.downloadsDirectory.appendingPathComponent(file.name) }
+    let actions: FileActions
     private var isZip: Bool { file.name.lowercased().hasSuffix(".zip") }
 
     var body: some View {
@@ -193,31 +225,42 @@ private struct FileRow: View {
             }
             Spacer()
             Menu {
-                if !file.isFolder { ShareLink(item: fileURL) { Label("分享", systemImage: "square.and.arrow.up") } }
-                Button(action: onRename) { Label("重命名", systemImage: "pencil") }
-                Button(action: onMove) { Label("移动", systemImage: "folder") }
-                if !file.isFolder {
-                    if isZip {
-                        Button(action: onExtract) { Label("解压到此处", systemImage: "archivebox") }
-                    } else {
-                        Button(action: onCompress) { Label("压缩为 zip", systemImage: "doc.zipper") }
-                    }
-                }
-                Button(role: .destructive, action: onDelete) { Label("删除", systemImage: "trash") }
+                fileMenuContent(file, actions)
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.Colors.tertiaryText)
             }
         }
         .swipeActions {
-            Button(role: .destructive, action: onDelete) { Label("删除", systemImage: "trash") }
+            Button(role: .destructive, action: actions.delete) { Label("删除", systemImage: "trash") }
             if !file.isFolder {
                 if isZip {
-                    Button(action: onExtract) { Label("解压", systemImage: "archivebox") }.tint(Theme.Colors.accent)
+                    Button(action: actions.extract) { Label("解压", systemImage: "archivebox") }.tint(Theme.Colors.accent)
                 } else {
-                    Button(action: onCompress) { Label("压缩", systemImage: "doc.zipper") }.tint(Theme.Colors.accent)
+                    Button(action: actions.compress) { Label("压缩", systemImage: "doc.zipper") }.tint(Theme.Colors.accent)
                 }
             }
         }
+    }
+}
+
+/// 网格视图的文件卡：大图标 + 名称 + 大小；长按出操作菜单（grid 无左滑）。
+private struct FileGridCell: View {
+    let file: FileItem
+    let actions: FileActions
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: file.symbol).font(.system(size: 34)).foregroundStyle(file.color)
+                .frame(height: 44)
+            Text(file.name).font(.system(size: 12)).foregroundStyle(Theme.Colors.primaryText)
+                .lineLimit(1).truncationMode(.middle)
+            Text(file.isFolder ? "文件夹" : file.size)
+                .font(.system(size: 10)).foregroundStyle(Theme.Colors.secondaryText).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.m)
+        .background(Theme.Colors.groupedBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+        .contextMenu { fileMenuContent(file, actions) }
     }
 }
 

@@ -11,6 +11,12 @@ final class CloudSync {
     /// 远程数据到达时回调（key, 解码用的原始 Data）。由存储层接管合并。
     var onRemoteChange: ((String, Data) -> Void)?
 
+    /// 待推送的最新值（按 key 合并，只保留最后一次）+ 合并写定时器。
+    /// 历史/书签每次导航都变更，逐次 `set + synchronize` 既浪费又会被系统限流；故合并一段时间一次推。
+    private var pending: [String: Data] = [:]
+    private var flushWork: DispatchWorkItem?
+    private let flushDelay: TimeInterval = 2
+
     private init() {
         NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
@@ -23,9 +29,20 @@ final class CloudSync {
         store.synchronize()
     }
 
-    /// 推送本地变更到 iCloud
+    /// 推送本地变更到 iCloud（合并写：同 key 多次变更只保留最后一次，延迟 `flushDelay` 统一落库）。
     func push(_ data: Data, for key: String) {
-        store.set(data, forKey: key)
+        pending[key] = data
+        flushWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.flush() }
+        flushWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + flushDelay, execute: work)
+    }
+
+    /// 把合并的待推送值一次性写入 KVS 并同步。
+    private func flush() {
+        guard !pending.isEmpty else { return }
+        for (key, data) in pending { store.set(data, forKey: key) }
+        pending.removeAll()
         store.synchronize()
     }
 

@@ -133,6 +133,15 @@ final class LibraryStore: ObservableObject {
         history = sections
     }
 
+    /// 页面加载完成后用真实网页标题回填「今天」里该地址的历史条目（地址栏/搜索打开时先以地址占位）。
+    func updateHistoryTitle(url: String, title: String) {
+        guard !url.isEmpty, !title.isEmpty,
+              let s = history.firstIndex(where: { $0.title == "今天" }),
+              let i = history[s].items.firstIndex(where: { $0.url == url }),
+              history[s].items[i].title != title else { return }
+        history[s].items[i].title = title
+    }
+
     func removeHistory(_ item: HistoryItem) {
         for s in history.indices { history[s].items.removeAll { $0.id == item.id } }
         history.removeAll { $0.items.isEmpty }

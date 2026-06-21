@@ -5,7 +5,8 @@ import SwiftUI
 @MainActor
 final class LiveDownload: ObservableObject, Identifiable {
     let id = UUID()
-    let fileName: String
+    /// 展示用文件名。下载开始时由地址推导，完成后回填为实际落盘名（可能取自服务器 `suggestedFilename`）。
+    @Published var fileName: String
     let sourceURL: URL
     @Published var bytesWritten: Int64 = 0
     @Published var totalBytes: Int64 = 0
@@ -107,6 +108,22 @@ final class DownloadManager: NSObject, ObservableObject {
         let host = url.host ?? "download"
         return "\(host)-\(Int(Date().timeIntervalSince1970)).html"
     }
+
+    /// 目标已存在时生成不冲突的文件名（追加 ` (1)`/` (2)`…），避免同名下载相互覆盖造成数据丢失。
+    nonisolated static func uniqueDestination(for name: String, in dir: URL) -> URL {
+        let fm = FileManager.default
+        let candidate = dir.appendingPathComponent(name)
+        guard fm.fileExists(atPath: candidate.path) else { return candidate }
+        let base = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var i = 1
+        while true {
+            let next = ext.isEmpty ? "\(base) (\(i))" : "\(base) (\(i)).\(ext)"
+            let url = dir.appendingPathComponent(next)
+            if !fm.fileExists(atPath: url.path) { return url }
+            i += 1
+        }
+    }
 }
 
 extension DownloadManager: URLSessionDownloadDelegate {
@@ -127,8 +144,8 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let suggested = downloadTask.response?.suggestedFilename
         let srcURL = downloadTask.originalRequest?.url
         let name = suggested ?? srcURL.map { DownloadManager.fileName(for: $0) } ?? "download.bin"
-        let dest = DownloadManager.downloadsDirectory.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: dest)
+        // 唯一目标名，避免同名下载相互覆盖（dest 保证不存在，无需先 removeItem）。
+        let dest = DownloadManager.uniqueDestination(for: name, in: DownloadManager.downloadsDirectory)
         let moveError: String?
         var finalSize: Int64 = 0
         do {
@@ -146,6 +163,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
             } else {
                 if finalSize > 0 { dl.totalBytes = finalSize; dl.bytesWritten = finalSize }
                 dl.localURL = dest
+                dl.fileName = dest.lastPathComponent   // 回填实际落盘名，保证 UI 与磁盘一致
                 dl.state = .completed
             }
         }

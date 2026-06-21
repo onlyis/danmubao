@@ -10,7 +10,6 @@ struct BrowserView: View {
 
 private struct BrowserContent: View {
     @EnvironmentObject var vm: BrowserViewModel
-    @EnvironmentObject var manager: DownloadManager
     @ObservedObject var engine: WebEngine
 
     var body: some View {
@@ -36,18 +35,11 @@ private struct BrowserContent: View {
                             }
                         }
                     )
-                pipButton
+                if vm.hasVideo { pipButton }   // 仅在检测到真实视频时显示悬浮入口
             }
         }
         .background(Theme.Colors.card)
-        .onAppear {
-            // 长按链接的「下载」动作接到真实下载管理器（弱引用 vm，避免 vm→tab→engine→闭包→vm 循环）
-            engine.onRequestDownload = { [weak vm] url in
-                manager.start(urlString: url.absoluteString)
-                vm?.showToast("开始下载…", symbol: "arrow.down.circle")
-            }
-            engine.onOpenInBackground = { [weak vm] url in vm?.openInBackground(url: url.absoluteString) }
-        }
+        // 长按链接的下载 / 后台打开回调统一在 vm.bindActiveEngine 里随引擎激活绑定（切标签也不失效）
         .onChange(of: vm.isDesktopMode) { _, on in engine.setDesktop(on) }
         .onChange(of: vm.isNightMode) { _, on in engine.applyNight(on) }
     }
@@ -55,7 +47,7 @@ private struct BrowserContent: View {
     private var addressBar: some View {
         HStack(spacing: Theme.Spacing.s) {
             Button {
-                Haptics.light(); vm.showWebsiteSettings = true
+                Haptics.light(); vm.showControlPanel = true
             } label: {
                 Image(systemName: "shield.lefthalf.filled")
                     .font(.system(size: 17))
@@ -104,7 +96,7 @@ private struct BrowserContent: View {
     }
 
     private var pipButton: some View {
-        Button { vm.showVideoFloat = true } label: {
+        Button { vm.openVideoFloat() } label: {
             Image(systemName: "pip.enter")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)

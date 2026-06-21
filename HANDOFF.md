@@ -105,6 +105,22 @@ MiniBrowser/
   - 实测：1 万标签启动建表 5.5ms、标签网格（LazyVGrid 惰性）流畅渲染、无崩溃。
   - **标签持久化**：普通标签（无痕不存）以轻量快照 `TabSnapshot`（id/isHome/title/url/tintHex，每条约百字节）存 `tabs.json`，重启恢复且**不建引擎**（选中再惰性加载）。写入合并防抖（`scheduleTabPersist`，0.5s 合并）+ 进入后台立即落盘（`scenePhase`→`persistTabsNow`）。不存 `interactionState`（海量标签下体积考虑）。实测写入/恢复闭环通过（来源 sample→disk）。
 - 删除死状态 `loadProgress`、示例下载/文件数据等。
+- **页面级状态跨标签/导航一致（2026-06-22）**：夜间/桌面版原是全局 bool 仅靠 `BrowserView.onChange` 单点推给「当时活跃的那个引擎」，切标签/页内跳转后失效（夜间 CSS 随 document 丢失、新引擎从没收到过开关）。现：`WebEngine` 各自持有 `nightMode`/`desktopMode`，`didFinish` 后按 `nightMode` **重注入**反色 CSS；新增 `WebEngine.syncPageState(night:desktop:)`；VM 用中心方法 `bindActiveEngine(_:)` 在 `open`/`select`/`activate`/`openInBackground`/`toggleIncognito` 时把全局开关同步进引擎（桌面仅对齐 UA、不重载，避免切标签触发重载）。
+- **历史标题回填（2026-06-22）**：地址栏/搜索打开时先以地址占位记历史，真实网页 `<title>` 异步才到、原先从不回填。现 `Tab.pendingHistoryURL` 仅首次加载置位，`bindActiveEngine` 绑定的 `WebEngine.onDidFinish` 在加载完成后用真实标题回填一次（`LibraryStore.updateHistoryTitle`），页内跳转不会把别的标题写回原条目。
+- **iCloud 写入合并防抖（2026-06-22）**：`CloudSync.push` 原本每次历史/书签变更（≈每次导航）都 `set+synchronize` 全量数据，浪费且会被系统限流。现按 key 合并、延迟 2s 统一 `flush`（同 key 只留最后一次）。
+- **KVO 去多余调度（2026-06-22）**：`WebEngine` 的进度/标题等 KVO 回调原先每次都 `Task { @MainActor }`；进度高频触发。改为主线程直接 `MainActor.assumeIsolated` 执行（非主线程才异步兜底）。
+- **tabs.json 编码移出主线程（2026-06-22）**：新增 `DiskStore.saveAsync<T: Encodable & Sendable>`（编码+写盘都在后台队列），`persistTabsNow` 主线程只取快照、后台编码，海量标签整表序列化不再卡主线程。`TabSnapshot`/`TabsState` 标记 `Sendable`。
+- **文件网格视图真实化 + 无痕 cookie 隔离（2026-06-22）**：① `FilesView` 的「网格/列表」切换原先 `isGrid` 被 toggle 但从不渲染网格；现补 `FileGridCell`（卡片+长按菜单），`isGrid` 真实切换；行/格共用 `FileActions` 闭包包与 `fileMenuContent`（DRY）。② 无痕标签的引擎改用**共享的 `WKWebsiteDataStore.nonPersistent()`**（`WebEngine.init(incognito:)`，`Tab.engine` 按 `isIncognito` 传入）——cookie/缓存仅存内存、与普通模式隔离、App 退出清空。无痕标签「列表」仍持久化（TabsState），但会话不落盘，这才是真正的无痕。
+- **被回收标签重新激活漏绑回调（2026-06-22）**：`bindActiveEngine` 原有 `guard tab.hasEngine`——被 LRU 回收过的标签再次选中时，`activateIfNeeded` 因 `didLoad` 已真不重建引擎，此刻 `hasEngine==false` → 直接 return 不绑定；随后 RootView 渲染才惰性重建引擎，导致夜间/桌面同步、下载/后台打开回调、视频检测、历史标题回填全部漏绑。改为 `guard !tab.isHome` 后**主动取 `tab.engine`**（在此惰性重建并恢复会话），保证回调一定绑到将显示的引擎。
+- **工具栏长按吃点击（2026-06-22）**：`ToolbarButton`/`TabsButton` 用 `longPressed` 标志抑制长按后的 tap，但长按后那次 tap 若未触发（手指挪开等）标志残留，会吃掉下一次正常点击。加 0.5s 兜底复位。
+- **切标签/切无痕内容不刷新（根因修复，2026-06-22）**：`RootView` 的 `BrowserView(engine:)` 加 `.id(tab.id)`。`UIViewRepresentable`（`WebViewContainer`）在视图身份不变时只走 `updateUIView`、**不会重新 `makeUIView`**，于是直接 tab→tab（或无痕↔普通）切换会复用上一个标签的 `WKWebView`、内容停在旧页。用 `.id(tab.id)` 让身份随标签变化，强制重新挂载正确引擎的 webView（引擎本身复用、不重建）。
+- **无痕 / 普通各记自己的当前标签 + 切换恢复（2026-06-22）**：`currentTabID` 原为两模式共用、切换时被覆盖成 `activeTabs.first`，导致来回切都跳第一个、且丢失另一模式的位置。现 VM 加 `normalCurrentID`/`incognitoCurrentID` 两个槽（`savedNormalID`/`savedIncognitoID` 统一读取），`toggleIncognito` 切换前存当前、切换后恢复目标模式上次的当前标签。
+- **无痕标签持久化（2026-06-22，按用户要求）**：原「无痕不存」。现 `TabsState` 扩展 `incognitoTabs`/`incognitoCurrentID`（旧字段保留默认值兼容），`scheduleTabPersist` 不再跳过无痕，`persistTabsNow` 同存两组，启动恢复两组并都建 `tabIndex`、默认进普通模式。注意：仅持久化标签**列表**（快照 title/url/tint），不含会话/cookie；恢复后选中再惰性重载。
+- **主菜单 / 控制面板可自定义（2026-06-22）**：新增可复用组件 `Components/ActionGrid.swift` 的 `EditableActionGrid`（长按进入编辑态 → 删除角标 / 拖动重排 / 「添加」更多功能），菜单（`MainMenuSheet`）与盾牌控制面板（`Features/WebsiteSettings/ControlPanelSheet.swift`）共用。① 主菜单保留「**多页左右滑动**」（`TabView` 分页），每页是一个 `EditableActionGrid`：长按编辑**当前页**（删除/拖动/添加），翻页改其它页；「添加」弹 grid 选择（排除所有页已用项）。布局持久化 `menu.json`，类型为 `[[String]]`（`vm.menuItems`，每个子数组一页），目录池 `MenuCatalog.all`、默认 `MenuCatalog.defaultPages`。② 盾牌按钮（地址栏左侧）原打开 `WebsiteSettingsSheet`，现打开新的 `ControlPanelSheet`——一组「当前网页操作」快捷功能（刷新/复制网址/分享/页面查找/看图/翻译/保存PDF/查看源码/滚动到顶底/夜间/电脑版/无图/广告 等），顺序持久化 `panel.json`（`vm.panelItems`），底部「更多网站设置」仍进 `WebsiteSettingsSheet`。功能分发集中到 `vm.performMenuAction(title)->Bool`（返回是否关闭弹层）+ `vm.actionIsOn(title)`，菜单/面板/（未来）其它入口共用同一张分发表。新增 `vm.showControlPanel`、`vm.shareItem`（系统分享 `ActivityView`）。
+- **视频悬浮真实检测 + 真实控制（2026-06-22）**：原 PiP 入口/悬浮窗恒显且为假渐变画面（「有菜单没视频」）。现：`WebEngine.detectVideo` JS 检测页面是否有可见 `<video>`，`vm.hasVideo` 驱动地址栏 PiP 入口的显隐（`bindActiveEngine`/`onDidFinish`/切标签时刷新，`goHome` 复位）；点击/菜单「视频悬浮」走 `vm.openVideoFloat()`，无视频则 toast「未检测到视频」。`FloatingVideoPlayer` 重写为**控制条**——直接操作页面真实 `<video>`（`videoTogglePlay`/`videoSeek±15`/`videoSetRate`/`videoRequestPiP`），每 0.5s `fetchVideoState` 显示真实进度/倍速，视频消失自动收起。
+- **夜间模式流程重整（2026-06-22）**：原 `isNightMode` 既注入网页反色 CSS、又强制 `resolvedScheme=.dark` + `RootView.isDark`，**整个 App（主页/设置/菜单）被一起拖成深色**，与「网页夜间模式」语义不符；且不持久化。现：夜间**只作用于网页内容**（`resolvedScheme` 仅由 `appearanceMode` 决定，`isDark` 不再看夜间），并持久化 `night.json`、重启恢复后由 `bindActiveEngine` 应用到引擎。（导航后重注入、切标签同步在前几轮已做。）
+- **下载同名覆盖防数据丢失 + UI 名一致（2026-06-22）**：`didFinishDownloadingTo` 原先 `removeItem(dest)` 后 move，下载两个同名文件会**静默删掉前一个**；且 `LiveDownload.fileName`（开始时由地址推导）可能与实际落盘的 `suggestedFilename` 不一致。现：新增 `DownloadManager.uniqueDestination(for:in:)` 同名追加 ` (1)`/` (2)`，落盘后把 `fileName`（改 `@Published var`）回填为真实落盘名，UI 列表与磁盘/`FileStore` 一致。
+- **引擎回调统一绑定点 `bindActiveEngine`（2026-06-22）**：长按链接的下载/后台打开回调原先在 `BrowserView.onAppear` 设置，只绑「onAppear 那个引擎」，切标签后新引擎回调为空。现 VM 加 `weak var downloadManager`（`BrowserApp` 注入），`bindActiveEngine` 成为引擎激活的唯一绑定点（夜间/桌面同步 + `onDidFinish` 回填历史标题 + 下载/后台打开回调），`BrowserView` 去掉相关 onAppear 与 `@EnvironmentObject manager`。因 `isBrowsing` 仅由 open/select/toggleIncognito 置真、这些路径都过 `bindActiveEngine`，引擎一旦可见回调必已绑定。
 
 - **ToastStore 拆分**：toast 从 `BrowserViewModel` 移到独立 `Models/ToastStore.swift`（`@EnvironmentObject var toasts`，App 里 `.environmentObject(vm.toasts)`）。原因：toast 几乎每个动作都触发，挂在 god VM 上时一次提示会让所有观察 vm 的视图重新求值；独立后只刷新 ToastView。`vm.showToast(...)` 保留为薄转发（`toasts.show`），既有调用点不变。
 
@@ -180,12 +196,12 @@ MiniBrowser/
 - **翻译**：UI 完整，未接真实翻译 API。**待决策**：选定翻译服务 + API Key，或用 iOS 17.4+ 系统 `TranslationSession`（部署目标 17.0，需 `@available` 降级）。
 - **搜索引擎**：✅ 已真实化（`SearchEngine` 模型 + 内置 6 家 + 自定义引擎，`vm.searchEngine` 持久化 `search_engine.json`/`custom_engines.json`，`WebEngine.normalize` 支持 `%s` 与追加两种模板）。入口：设置→搜索引擎 / 菜单→搜索引擎（route `.searchEngine`）。「搜索建议/AI 搜索/清除搜索历史」仍占位。
 - **二维码**：✅ 已真实化（生成 `CIQRCodeGenerator`、扫描 `AVCaptureMetadataOutput`）。仅「相册识别」按钮仍为占位（未接 `PHPicker` + `CIDetector`）。
-- **视频悬浮/画中画/投屏/倍速**：悬浮窗 UI 可拖拽吸附，但未接真实 `AVPlayer`/`AVPictureInPictureController`。
+- **视频悬浮/画中画/倍速**：✅ 已真实化——`detectVideo` 检测页面真实 `<video>`（决定入口显隐），`FloatingVideoPlayer` 控制条直接驱动页面视频（播放/暂停、±15s、倍速、调起 WKWebView 内置画中画 `webkitSetPresentationMode`），显示真实进度。**投屏（AirPlay/DLNA）/后台播放/镜像/视频截图** 仍占位。
 - **看图模式**：✅ 已真实提取网页图片（`WebEngine.fetchImageURLs` + `AsyncImage`），✅ 批量保存到相册（`Models/ImageSaver.swift`，下载远程图后 `UIImageWriteToSavedPhotosAlbum`）+ 分享（`ShareLink`）。**漫画/电子书** 仍为渐变/书页占位，未解析真实长图或 epub/pdf。
 - **阅读模式**：示例正文，未做正文抽取（Readability）。
 - **文件**：解压/压缩仅 zip；rar/7z 未支持。「Wi-Fi 传输」「从相册/系统导入」为占位按钮。「以纯文本打开/编码选择/文本编辑」未实现。
 - **网站设置**：仅桌面版、夜间模式真实联动引擎；其余开关为本地 @State 占位。
-- **长按快捷操作 / 自定义菜单顺序 / 工具栏按钮自定义**：选择界面完整，但未真正改变按钮行为。
+- **自定义菜单顺序 / 控制面板**：✅ 已真实化（主菜单与盾牌控制面板均可长按编辑：删除/拖动/添加，持久化 `menu.json`/`panel.json`）。工具栏按钮自定义此前已真实。**长按快捷操作（手势触发）** 由手势系统承担。
 - **下载触发**：✅ 网页内长按链接已可下载（`WebEngine` 的 `WKUIDelegate` 上下文菜单「下载链接」→ `DownloadManager.start`）；划词浮层改为读取真实选中文本（`fetchSelectedText`），无选中时让位给原生菜单，两者不再冲突。菜单「下载资源」入口仍保留。
 - **网页导出/打印**：✅ 保存 PDF（`WKWebView.createPDF`）、保存 HTML（`outerHTML`）、查看源码（`SourceCodeView` 弹层，可复制）、打印（`UIPrintInteractionController`）均已真实（菜单 page2 接 `vm.saveCurrentPDF/saveCurrentHTML/viewSource/printCurrent`，导出落地 `Documents/Downloads`）。WebArchive/长截图仍占位。
 - **大量设置项**：`PlaceholderSettings` 占位（主页设置、标签页、User-Agent、视频播放、文件管理、主题子项、导入导出书签、默认浏览器、添加到主屏幕、更新日志/隐私政策/用户协议等）。
@@ -217,7 +233,8 @@ MiniBrowser/
 - **临时验证代码务必还原**：每次用 `BrowserApp.onAppear` 注入临时状态截图后都要删掉，别提交。
 - **xcodegen 会重写 Info.plist**：改 plist 要改 `project.yml` 的 `info.properties`，不要直接改生成的 plist。
 - **颜色持久化**：凡是要存盘的模型，颜色用 `colorHex: UInt`，不要直接存 `Color`。
-- **菜单动作分发**：`MainMenuSheet.handle(_:)` 用功能**标题字符串** switch 分发；新增菜单项要在 `MenuCatalog` 加项并在 `handle` 加 case，否则只是 dismiss。
+- **菜单动作分发**：已集中到 `BrowserViewModel.performMenuAction(_ title:)->Bool`（按**标题字符串** switch，返回是否关闭弹层）+ `actionIsOn(_:)`。菜单/控制面板/未来入口共用。新增功能：在对应目录（`MenuCatalog` / `ControlPanelCatalog`）加项，并在 `performMenuAction` 加 case，否则会 toast「暂未实现」。
+- **可编辑宫格**：`EditableActionGrid`（`Components/ActionGrid.swift`）由 `titles`（绑定 VM 持久化数组，didSet 落盘）+ `pool`（目录）+ `isOn`/`perform` 闭包驱动；长按进编辑态。两处入口（菜单 `menu.json`、面板 `panel.json`）复用。
 
 ---
 
@@ -226,7 +243,8 @@ MiniBrowser/
 - 书签：`Documents/bookmarks.json`
 - 历史：`Documents/history.json`
 - 下载文件：`Documents/Downloads/`（`DownloadManager.downloadsDirectory`）
-- 标签：`Documents/tabs.json`（`TabsState`，普通标签快照 + 当前 id；无痕不存）
+- 标签：`Documents/tabs.json`（`TabsState`，普通 + 无痕两组快照 + 各自当前 id）
+- 菜单布局：`Documents/menu.json`（`[[String]]` 分页）；控制面板：`Documents/panel.json`；网页夜间：`Documents/night.json`
 - 用户脚本：`Documents/userscripts.json`；插件状态：`Documents/plugins.json`
 - 首次启动无文件时回落到 `SampleData`（在 `BrowserViewModel.swift` 底部）。
 

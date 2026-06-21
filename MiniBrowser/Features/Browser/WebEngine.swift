@@ -19,10 +19,18 @@ final class WebEngine: NSObject, ObservableObject {
     private let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
     private var observations: [NSKeyValueObservation] = []
 
+    /// 页面级状态（夜间 / 桌面版）——每个引擎各自持有。
+    /// 夜间靠注入 CSS，页面导航会丢失，故 `didFinish` 后按此标志重注入；
+    /// 切换标签时由 `syncPageState` 把全局开关同步进来，避免新引擎与全局开关脱节。
+    private(set) var nightMode = false
+    private(set) var desktopMode = false
+
     /// 长按链接时通过原生上下文菜单请求下载（由视图层接到 DownloadManager）。
     var onRequestDownload: ((URL) -> Void)?
     /// 长按链接「在后台打开」回调。
     var onOpenInBackground: ((URL) -> Void)?
+    /// 页面加载完成回调（用于回填历史标题等）。
+    var onDidFinish: (() -> Void)?
 
     /// 会话状态：完整的前进/后退列表 + 当前页 + 滚动位置（`WKWebView.interactionState`, iOS 15+）。
     /// 用于引擎被 LRU 池回收后重建时无损恢复——避免丢失历史或从头加载页面。
@@ -31,10 +39,15 @@ final class WebEngine: NSObject, ObservableObject {
         set { if let newValue { webView.interactionState = newValue } }
     }
 
-    override init() {
+    /// 全体无痕标签共享的临时数据存储：cookie/缓存仅存内存，与普通浏览隔离，App 退出即清空。
+    /// 无痕标签的「列表」仍会持久化（见 TabsState），但其会话/cookie 不落盘——这才是真正的无痕。
+    private static let incognitoDataStore = WKWebsiteDataStore.nonPersistent()
+
+    init(incognito: Bool = false) {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
+        if incognito { config.websiteDataStore = Self.incognitoDataStore }   // cookie 与普通模式隔离
         // 注入用户脚本 + 插件（必须在创建 webView 前写入 userContentController）
         let controller = WKUserContentController()
         UserScriptStore.shared.installable().forEach(controller.addUserScript)
@@ -51,9 +64,12 @@ final class WebEngine: NSObject, ObservableObject {
     }
 
     private func setupObservers() {
-        func bind<T>(_ keyPath: KeyPath<WKWebView, T>, _ apply: @escaping (WKWebView) -> Void) -> NSKeyValueObservation {
+        func bind<T>(_ keyPath: KeyPath<WKWebView, T>, _ apply: @escaping @MainActor (WKWebView) -> Void) -> NSKeyValueObservation {
             webView.observe(keyPath, options: [.new]) { wv, _ in
-                Task { @MainActor in apply(wv) }
+                // WKWebView 的 KVO 通知本就在主线程派发：直接同步执行，省掉每次进度更新的 Task 调度开销。
+                // 兜底——万一不在主线程，回主线程异步执行。
+                if Thread.isMainThread { MainActor.assumeIsolated { apply(wv) } }
+                else { Task { @MainActor in apply(wv) } }
             }
         }
         observations = [
@@ -84,9 +100,18 @@ final class WebEngine: NSObject, ObservableObject {
     func stop() { webView.stopLoading() }
 
     // MARK: - 网站设置联动
-    func setDesktop(_ on: Bool) {
+    /// 切换桌面版：改 UA。`reload` 默认 true（用户主动切换需重排版生效）；
+    /// 切标签同步时传 false，只对齐 UA 不触发重载。
+    func setDesktop(_ on: Bool, reload: Bool = true) {
+        desktopMode = on
         webView.customUserAgent = on ? desktopUA : nil
-        webView.reload()
+        if reload { webView.reload() }
+    }
+
+    /// 标签激活时把全局页面状态同步进本引擎：夜间立即注入（无重载、幂等），桌面仅对齐 UA。
+    func syncPageState(night: Bool, desktop: Bool) {
+        applyNight(night)
+        if desktop != desktopMode { setDesktop(desktop, reload: false) }
     }
 
     /// 提取当前页面中的图片地址（去重，仅 http(s)）
@@ -150,8 +175,55 @@ final class WebEngine: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - 视频检测与控制（悬浮播放器直接驱动页面里的真实 <video>）
+    /// 页面是否存在「可播放、可见」的视频（有 src/source 且尺寸 > 0）。
+    func detectVideo(_ completion: @escaping (Bool) -> Void) {
+        let js = """
+        (function(){
+          var vs = document.getElementsByTagName('video');
+          for (var i=0;i<vs.length;i++){
+            var v = vs[i], r = v.getBoundingClientRect();
+            if ((v.currentSrc || v.src || v.querySelector('source')) && r.width>1 && r.height>1) return true;
+          }
+          return false;
+        })();
+        """
+        webView.evaluateJavaScript(js) { result, _ in completion((result as? Bool) ?? false) }
+    }
+
+    /// 对页面首个有效 <video> 执行一段脚本（player 控制）。
+    private func videoScript(_ body: String) -> String {
+        "(function(){var v=document.querySelector('video');if(!v)return null;\(body)})();"
+    }
+    func videoTogglePlay() { webView.evaluateJavaScript(videoScript("if(v.paused){v.play()}else{v.pause()}")) }
+    func videoSetRate(_ rate: Double) { webView.evaluateJavaScript(videoScript("v.playbackRate=\(rate);")) }
+    func videoSeek(by seconds: Double) { webView.evaluateJavaScript(videoScript("v.currentTime=Math.max(0,(v.currentTime||0)+(\(seconds)));")) }
+    func videoRequestPiP() {
+        // 调起 WKWebView 内置的画中画（需页面视频支持）。
+        webView.evaluateJavaScript(videoScript("if(v.webkitSupportsPresentationMode&&v.webkitSetPresentationMode){v.webkitSetPresentationMode('picture-in-picture')}else if(v.requestPictureInPicture){v.requestPictureInPicture()}"))
+    }
+
+    /// 当前视频播放状态（用于悬浮播放器显示真实进度/倍速）。
+    struct VideoState { var current: Double; var duration: Double; var paused: Bool; var rate: Double }
+    func fetchVideoState(_ completion: @escaping (VideoState?) -> Void) {
+        let js = videoScript("return {c:v.currentTime||0,d:isFinite(v.duration)?v.duration:0,p:v.paused,r:v.playbackRate||1};")
+        webView.evaluateJavaScript(js) { result, _ in
+            guard let d = result as? [String: Any] else { completion(nil); return }
+            completion(VideoState(current: d["c"] as? Double ?? 0,
+                                  duration: d["d"] as? Double ?? 0,
+                                  paused: d["p"] as? Bool ?? true,
+                                  rate: d["r"] as? Double ?? 1))
+        }
+    }
+
     func applyNight(_ on: Bool) {
-        let js = on
+        nightMode = on
+        injectNightCSS()
+    }
+
+    /// 按 `nightMode` 注入或移除反色样式（导航后 document 会丢失，需重注入）。
+    private func injectNightCSS() {
+        let js = nightMode
         ? "var s=document.getElementById('__mb_night');if(!s){s=document.createElement('style');s.id='__mb_night';document.head.appendChild(s);}s.innerHTML='html{filter:invert(1) hue-rotate(180deg)!important;background:#111!important}img,video,picture,svg,canvas{filter:invert(1) hue-rotate(180deg)!important}';"
         : "var s=document.getElementById('__mb_night');if(s)s.remove();"
         webView.evaluateJavaScript(js)
@@ -184,6 +256,8 @@ extension WebEngine: WKNavigationDelegate {
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         isLoading = false; navigating = false
+        if nightMode { injectNightCSS() }   // 导航后 document 丢失反色样式，重注入以保持夜间
+        onDidFinish?()
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         isLoading = false; navigating = false
