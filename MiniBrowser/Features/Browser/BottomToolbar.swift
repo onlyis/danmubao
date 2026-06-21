@@ -1,24 +1,35 @@
 import SwiftUI
 
-/// 底部固定工具栏：后退、前进、菜单、标签页、主页。始终可见。
+/// 工具栏按钮种类（可在「自定义底部工具栏按钮」里排序；gesture 为特色项，需区分对待）。
+enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
+    case back, forward, menu, tabs, home, gesture
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .back: return "后退"; case .forward: return "前进"; case .menu: return "菜单"
+        case .tabs: return "标签页"; case .home: return "主页"; case .gesture: return "手势按钮"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .back: return "chevron.left"; case .forward: return "chevron.right"
+        case .menu: return "line.3.horizontal"; case .tabs: return "square.on.square"
+        case .home: return "house"; case .gesture: return "hand.draw.fill"
+        }
+    }
+    var isGesture: Bool { self == .gesture }
+}
+
+/// 底部固定工具栏：按 `vm.toolbarItems` 顺序渲染，始终可见。
+/// `.gesture` 槽位渲染为空占位，由 GestureButton 覆盖层在该位置绘制特色图标并承接画手势。
 struct BottomToolbar: View {
     @EnvironmentObject var vm: BrowserViewModel
     var engine: WebEngine?
 
     var body: some View {
         HStack(spacing: 0) {
-            ToolbarButton(symbol: "chevron.left", enabled: vm.isBrowsing) {
-                vm.back()
-            }
-            ForwardButton(engine: engine) { vm.forward() }
-            ToolbarButton(symbol: "line.3.horizontal") {
-                vm.showMenu = true
-            }
-            TabsButton(count: vm.tabCount) {
-                vm.showTabs = true
-            }
-            ToolbarButton(symbol: vm.isBrowsing ? "house" : "house.fill") {
-                vm.goHome()
+            ForEach(vm.toolbarItems) { item in
+                button(for: item)
             }
         }
         .frame(height: Theme.Size.toolbarHeight)
@@ -28,6 +39,18 @@ struct BottomToolbar: View {
                 .overlay(alignment: .top) { Hairline() }
                 .ignoresSafeArea(edges: .bottom)
         )
+    }
+
+    @ViewBuilder
+    private func button(for item: ToolbarItemKind) -> some View {
+        switch item {
+        case .back:    ToolbarButton(symbol: "chevron.left", enabled: vm.isBrowsing) { vm.back() }
+        case .forward: ForwardButton(engine: engine) { vm.forward() }
+        case .menu:    ToolbarButton(symbol: "line.3.horizontal") { vm.showMenu = true }
+        case .tabs:    TabsButton(count: vm.tabCount) { vm.showTabs = true }
+        case .home:    ToolbarButton(symbol: vm.isBrowsing ? "house" : "house.fill") { vm.goHome() }
+        case .gesture: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)  // 占位，覆盖层绘制
+        }
     }
 }
 

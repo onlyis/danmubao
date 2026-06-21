@@ -116,6 +116,21 @@ final class BrowserViewModel: ObservableObject {
     /// 手势按钮配置（持久化）
     @Published var gesture = GestureConfig() { didSet { DiskStore.save(gesture, to: "gestures.json") } }
 
+    /// 底部工具栏按钮顺序（可自定义、持久化）。`.gesture` 仅在手势为「工具栏」放置时存在。
+    @Published var toolbarItems: [ToolbarItemKind] = [.back, .forward, .menu, .tabs, .home] {
+        didSet { DiskStore.save(toolbarItems, to: "toolbar.json") }
+    }
+
+    /// 切换手势放置方式：工具栏模式则把 `.gesture` 并入工具栏，悬浮模式则移出。
+    func setGesturePlacement(_ p: GesturePlacement) {
+        gesture.placement = p
+        if p == .toolbar {
+            if !toolbarItems.contains(.gesture) { toolbarItems.append(.gesture) }
+        } else {
+            toolbarItems.removeAll { $0 == .gesture }
+        }
+    }
+
     /// 看图模式：当前页面提取出的图片地址
     @Published var pageImages: [String] = []
 
@@ -123,6 +138,7 @@ final class BrowserViewModel: ObservableObject {
         if let g = DiskStore.load(GestureConfig.self, from: "gestures.json") { gesture = g }
         if let e = DiskStore.load(SearchEngine.self, from: "search_engine.json") { searchEngine = e }
         if let c = DiskStore.load([SearchEngine].self, from: "custom_engines.json") { customEngines = c }
+        if let t = DiskStore.load([ToolbarItemKind].self, from: "toolbar.json") { toolbarItems = t }
         // 恢复上次的标签（无痕标签不持久化）。属性观察器在 init 中不触发，恢复不会回写。
         if let state = DiskStore.load(TabsState.self, from: "tabs.json"), !state.tabs.isEmpty {
             tabs = state.tabs.map(Tab.init)

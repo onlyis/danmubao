@@ -102,7 +102,7 @@ struct GestureRule: Identifiable, Codable, Hashable {
 // MARK: - 放置方式
 enum GesturePlacement: String, Codable, CaseIterable, Identifiable {
     case floating = "悬浮按钮"
-    case bottomDock = "底部居中"
+    case toolbar = "工具栏图标"
     var id: String { rawValue }
 }
 

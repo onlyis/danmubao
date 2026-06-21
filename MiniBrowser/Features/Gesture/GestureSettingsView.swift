@@ -19,7 +19,8 @@ struct GestureSettingsView: View {
 
             if vm.gesture.enabled {
                 Section {
-                    Picker(selection: $vm.gesture.placement) {
+                    Picker(selection: Binding(get: { vm.gesture.placement },
+                                              set: { vm.setGesturePlacement($0) })) {
                         ForEach(GesturePlacement.allCases) { Text($0.rawValue).tag($0) }
                     } label: {
                         Label("放置方式", systemImage: "square.grid.2x2")
@@ -30,7 +31,7 @@ struct GestureSettingsView: View {
                 } footer: {
                     Text(vm.gesture.placement == .floating
                          ? "悬浮按钮可拖动；拖到屏幕左右边缘会贴边停靠，只露出一部分。"
-                         : "固定在底部工具栏上方居中，像一个图标。")
+                         : "作为底部工具栏的一个图标，可在「自定义设置 → 自定义底部工具栏按钮」里调整位置。")
                 }
 
                 Section("手势控制") {

@@ -58,7 +58,7 @@ struct CustomSettingsView: View {
                 Stepper("图标每行数量：\(perRow)", value: $perRow, in: 3...5)
             }
             Section("自定义") {
-                NavigationLink("自定义底部工具栏按钮") { PlaceholderSettings(title: "工具栏按钮") }
+                NavigationLink("自定义底部工具栏按钮") { ToolbarCustomizeView() }
                 NavigationLink("自定义菜单按钮顺序") { PlaceholderSettings(title: "菜单顺序") }
                 NavigationLink("自定义首页壁纸") { PlaceholderSettings(title: "首页壁纸") }
                 NavigationLink("自定义站点图标") { PlaceholderSettings(title: "站点图标") }
@@ -70,6 +70,41 @@ struct CustomSettingsView: View {
             }
         }
         .navigationTitle("自定义设置").navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - 自定义底部工具栏按钮
+struct ToolbarCustomizeView: View {
+    @EnvironmentObject var vm: BrowserViewModel
+    var body: some View {
+        List {
+            Section {
+                ForEach(vm.toolbarItems) { item in
+                    HStack(spacing: Theme.Spacing.m) {
+                        Image(systemName: item.symbol)
+                            .font(.system(size: 17))
+                            .foregroundStyle(item.isGesture ? Theme.Colors.accent : Theme.Colors.primaryText)
+                            .frame(width: 28)
+                        Text(item.title)
+                            .foregroundStyle(item.isGesture ? Theme.Colors.accent : Theme.Colors.primaryText)
+                        if item.isGesture {
+                            Text("特色").font(.system(size: 11, weight: .semibold))
+                                .padding(.horizontal, 7).padding(.vertical, 2)
+                                .background(Theme.Colors.accent.opacity(0.15), in: Capsule())
+                                .foregroundStyle(Theme.Colors.accent)
+                        }
+                        Spacer()
+                    }
+                }
+                .onMove { vm.toolbarItems.move(fromOffsets: $0, toOffset: $1) }
+            } header: {
+                Text("拖动右侧把手调整底部工具栏图标顺序")
+            } footer: {
+                Text("「手势按钮」是特色项：在「设置 → 手势按钮 → 放置方式」选「工具栏图标」后会出现在这里，可与其它图标一起排序。")
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .navigationTitle("工具栏按钮").navigationBarTitleDisplayMode(.inline)
     }
 }
 

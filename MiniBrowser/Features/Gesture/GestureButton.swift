@@ -14,9 +14,10 @@ struct GestureButton: View {
     @State private var liftWork: DispatchWorkItem?
 
     private let coordSpace = "gestureRoot"
+    private var inToolbar: Bool { vm.gesture.placement == .toolbar }
     private var radius: CGFloat {
-        let base: CGFloat = vm.gesture.placement == .bottomDock ? 22 : 27   // 底部居中更像工具栏图标
-        return base * vm.gesture.buttonSize
+        let base: CGFloat = inToolbar ? 19 : 27   // 工具栏模式更像图标
+        return base * (inToolbar ? 1 : vm.gesture.buttonSize)
     }
 
     var body: some View {
@@ -39,19 +40,32 @@ struct GestureButton: View {
     }
 
     // MARK: - 按钮
+    @ViewBuilder
     private var button: some View {
-        ZStack {
-            Circle()
-                .fill(phase == .moving ? Theme.Colors.accent : Theme.Colors.accent.opacity(0.92))
-                .frame(width: radius * 2, height: radius * 2)
-                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+        if inToolbar {
+            // 工具栏图标：用强调色 + 细环 + 底色，和其它灰色图标区分开
             Image(systemName: "hand.draw.fill")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(.white)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Theme.Colors.accent)
+                .frame(width: radius * 2, height: radius * 2)
+                .background(Circle().fill(Theme.Colors.accent.opacity(0.12)))
+                .overlay(Circle().strokeBorder(Theme.Colors.accent.opacity(0.45), lineWidth: 1.5))
+                .scaleEffect(phase == .gesturing ? 1.15 : 1)
+                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phase)
+        } else {
+            ZStack {
+                Circle()
+                    .fill(phase == .moving ? Theme.Colors.accent : Theme.Colors.accent.opacity(0.92))
+                    .frame(width: radius * 2, height: radius * 2)
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                Image(systemName: "hand.draw.fill")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .scaleEffect(phase == .gesturing ? 1.12 : (phase == .moving ? 1.18 : 1))
+            .opacity(phase == .gesturing ? 0.85 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phase)
         }
-        .scaleEffect(phase == .gesturing ? 1.12 : (phase == .moving ? 1.18 : 1))
-        .opacity(phase == .gesturing ? 0.85 : 1)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phase)
     }
 
     /// 停靠在边缘且空闲时半透明（露一部分在视野内）。
@@ -102,9 +116,12 @@ struct GestureButton: View {
 
     // MARK: - 位置
     private func center(in size: CGSize) -> CGPoint {
-        // 底部居中：固定在工具栏上方中间，不可移动
-        if vm.gesture.placement == .bottomDock {
-            return CGPoint(x: size.width / 2, y: size.height - Theme.Size.toolbarHeight - radius - 10)
+        // 工具栏图标：定位到 .gesture 在工具栏中的槽位（等分），不可移动
+        if inToolbar, let idx = vm.toolbarItems.firstIndex(of: .gesture) {
+            let count = max(vm.toolbarItems.count, 1)
+            let x = (CGFloat(idx) + 0.5) / CGFloat(count) * size.width
+            let y = size.height - (34 + Theme.Size.toolbarHeight / 2)   // 安全区底 + 半个工具栏
+            return CGPoint(x: x, y: y)
         }
         if phase == .moving, let livePos { return clamp(livePos, in: size) }
         return clamp(CGPoint(x: vm.gesture.posX * size.width, y: vm.gesture.posY * size.height), in: size)
