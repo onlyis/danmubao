@@ -17,6 +17,29 @@ struct GestureSettingsView: View {
                 Text("按住右下角悬浮按钮拖出笔画即可触发；长按可移动按钮，轻点打开本页。")
             }
 
+            if vm.gesture.enabled {
+                Section("手势控制") {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Label("灵敏度", systemImage: "dial.medium")
+                            Spacer()
+                            Text(sensitivityText).font(.system(size: 13)).foregroundStyle(Theme.Colors.secondaryText)
+                        }
+                        Slider(value: $vm.gesture.sensitivity, in: 0.5...1.6, step: 0.1)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Label("按钮大小", systemImage: "circle.circle")
+                            Spacer()
+                            Text("\(Int(vm.gesture.buttonSize * 100))%").font(.system(size: 13)).foregroundStyle(Theme.Colors.secondaryText)
+                        }
+                        Slider(value: $vm.gesture.buttonSize, in: 0.8...1.4, step: 0.1)
+                    }
+                    Toggle(isOn: $vm.gesture.enableCircle) { Label("识别圆形手势 ↻ ↺", systemImage: "circle.dashed") }
+                    Toggle(isOn: $vm.gesture.haptics) { Label("触觉反馈", systemImage: "waveform") }
+                }
+            }
+
             Section("手势规则") {
                 ForEach(vm.gesture.rules) { rule in
                     Button { editing = rule } label: { RuleRow(rule: rule) }
@@ -45,6 +68,14 @@ struct GestureSettingsView: View {
             GestureRuleEditView(rule: GestureRule(directions: [], action: .newTab)) { created in
                 if !created.directions.isEmpty { vm.gesture.rules.append(created) }
             }
+        }
+    }
+
+    private var sensitivityText: String {
+        switch vm.gesture.sensitivity {
+        case ..<0.8: return "迟钝"
+        case ..<1.2: return "标准"
+        default: return "灵敏"
         }
     }
 

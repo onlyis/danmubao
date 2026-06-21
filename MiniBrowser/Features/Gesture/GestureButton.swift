@@ -14,7 +14,7 @@ struct GestureButton: View {
     @State private var liftWork: DispatchWorkItem?
 
     private let coordSpace = "gestureRoot"
-    private let radius: CGFloat = 27
+    private var radius: CGFloat { 27 * vm.gesture.buttonSize }
 
     var body: some View {
         GeometryReader { geo in
@@ -124,7 +124,7 @@ struct GestureButton: View {
                     if let last = points.last,
                        hypot(v.location.x - last.x, v.location.y - last.y) < 4 { break }
                     points.append(v.location)
-                    recognized = GestureRecognizer.recognize(points)
+                    recognized = GestureRecognizer.recognize(points, segment: vm.gesture.recognizeSegment, detectCircle: vm.gesture.enableCircle)
                     matched = vm.matchGesture(recognized)
                 case .moving:
                     livePos = v.location
@@ -134,7 +134,7 @@ struct GestureButton: View {
                 liftWork?.cancel()
                 switch phase {
                 case .gesturing:
-                    let dirs = GestureRecognizer.recognize(points)
+                    let dirs = GestureRecognizer.recognize(points, segment: vm.gesture.recognizeSegment, detectCircle: vm.gesture.enableCircle)
                     if let action = vm.matchGesture(dirs) {
                         vm.perform(action)
                     } else if !dirs.isEmpty {

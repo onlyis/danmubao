@@ -8,6 +8,14 @@ struct SettingsView: View {
 
     var body: some View {
         List {
+            Section {
+                nav("手势按钮", "hand.draw.fill", Color(hex: 0xFF2D55)) { GestureSettingsView() }
+            } header: {
+                Text("特色功能")
+            } footer: {
+                Text("悬浮按钮拖出笔画手势触发各种操作，支持圆形手势与灵敏度调节。")
+            }
+
             Section("基础") {
                 nav("通用设置", "gearshape", Color(hex: 0x8E8E93)) { GeneralSettingsView() }
                 nav("主页设置", "house", Color(hex: 0xFF9500)) { PlaceholderSettings(title: "主页设置") }
@@ -34,7 +42,6 @@ struct SettingsView: View {
                 nav("电子书阅读器", "book", Color(hex: 0xFF9500)) { EbookLibraryView() }
                 nav("JavaScript 扩展", "curlybraces", Color(hex: 0x5856D6)) { JSExtensionsView() }
                 nav("二维码工具", "qrcode", Color(hex: 0x000000)) { QRScannerView() }
-                nav("手势按钮", "hand.draw", Color(hex: 0xFF2D55)) { GestureSettingsView() }
                 nav("开发者工具", "hammer", Color(hex: 0x8E8E93)) { DevToolsView() }
             }
 

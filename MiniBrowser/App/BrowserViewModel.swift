@@ -226,7 +226,7 @@ final class BrowserViewModel: ObservableObject {
         case .scrollBottom:
             engine?.webView.evaluateJavaScript("window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})")
         }
-        Haptics.soft()
+        if gesture.haptics { Haptics.soft() }
         showToast(action.title, symbol: action.symbol)
     }
 

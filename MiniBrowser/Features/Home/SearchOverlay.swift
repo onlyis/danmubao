@@ -47,19 +47,17 @@ struct SearchOverlay: View {
             Hairline()
 
             List {
-                // 剪贴板提示
-                if let clip = clipboardURL {
+                // 剪贴板提示：仅用 hasURLs 探测（不触发系统粘贴提示），点击时才读取
+                if hasClipURL {
                     Section {
-                        Button { vm.open(url: clip); dismiss() } label: {
+                        Button {
+                            if let u = UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string {
+                                vm.open(url: u); dismiss()
+                            }
+                        } label: {
                             HStack(spacing: Theme.Spacing.m) {
-                                Image(systemName: "doc.on.clipboard")
-                                    .foregroundStyle(Theme.Colors.accent)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("打开复制的网址").font(.system(size: 15))
-                                        .foregroundStyle(Theme.Colors.primaryText)
-                                    Text(clip).font(.system(size: 13))
-                                        .foregroundStyle(Theme.Colors.secondaryText).lineLimit(1)
-                                }
+                                Image(systemName: "doc.on.clipboard").foregroundStyle(Theme.Colors.accent)
+                                Text("打开剪贴板中的网址").font(.system(size: 15)).foregroundStyle(Theme.Colors.primaryText)
                             }
                         }
                     }
@@ -91,14 +89,8 @@ struct SearchOverlay: View {
         .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { focused = true } }
     }
 
-    /// 真实读取剪贴板，仅当内容像网址（无空格、含点）时提示「打开复制的网址」。
-    /// 用 hasStrings 先判空，避免无内容时触发系统粘贴提示横幅。
-    private var clipboardURL: String? {
-        guard UIPasteboard.general.hasStrings,
-              let s = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !s.isEmpty, !s.contains(" "), s.contains(".") else { return nil }
-        return s
-    }
+    /// 仅探测剪贴板是否含网址（不触发系统粘贴提示），真正读取放到用户点击时。
+    private var hasClipURL: Bool { UIPasteboard.general.hasURLs }
 
     private var displayedSuggestions: [String] {
         text.isEmpty ? suggestions : suggestions.filter { $0.localizedCaseInsensitiveContains(text) } + [text]

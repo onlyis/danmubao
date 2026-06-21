@@ -110,7 +110,7 @@ MiniBrowser/
 
 ### 手势按钮（仿 BetterAndBetter，`Features/Gesture/`）
 
-层次：**触发**（按住右下角悬浮按钮）→ **手势**（笔画 = 8 向 `GestureDirection` 的有序序列，连续同向合并）→ **功能**（`GestureAction`）。规则 `GestureRule` = 手势→功能。
+层次：**触发**（按住右下角悬浮按钮）→ **手势**（笔画 = 8 向 `GestureDirection` 的有序序列，连续同向合并；另支持**圆形** `circleClockwise/circleCounterClockwise`，由转角和识别）→ **功能**（`GestureAction`）。规则 `GestureRule` = 手势→功能。`GestureConfig` 含灵敏度/按钮大小/圆形开关/触觉等可配置项（`GestureSettingsView` 的「手势控制」区）。设置页里手势按钮置顶为「特色功能」单独分组。
 
 - `GestureModels.swift`：方向/功能/规则/`GestureConfig`(启用+归一化位置+规则数组) + `GestureRecognizer.recognize(points)`（按段长阈值把路径切成方向 token）。
 - `GestureButton.swift`：全屏 ZStack 承载笔画轨迹（命名坐标空间 `gestureRoot`）；状态机 `idle→deciding→gesturing/moving`：拖动>12pt 进笔画模式（画 Canvas 轨迹 + 实时识别 + 命中功能 HUD），按住 0.45s 进移动模式（重定位按钮并存归一化位置），轻点打开配置页。

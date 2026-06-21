@@ -14,12 +14,12 @@ struct MainMenuSheet: View {
             Hairline().padding(.horizontal, Theme.Spacing.l)
 
             TabView(selection: $page) {
-                menuGrid(MenuCatalog.page1).tag(0)
-                menuGrid(MenuCatalog.page2).tag(1)
-                menuGrid(MenuCatalog.page3).tag(2)
+                ScrollView { menuGrid(MenuCatalog.page1) }.tag(0)
+                ScrollView { menuGrid(MenuCatalog.page2) }.tag(1)
+                ScrollView { menuGrid(MenuCatalog.page3) }.tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
-            .frame(minHeight: 300)
+            .frame(maxHeight: .infinity)
 
             statusBar
         }
@@ -58,6 +58,7 @@ struct MainMenuSheet: View {
         }
         .padding(.horizontal, Theme.Spacing.l)
         .padding(.top, Theme.Spacing.l)
+        .padding(.bottom, 36)   // 给底部页码点留白，避免遮挡最后一行
     }
 
     private var statusBar: some View {

@@ -1,13 +1,16 @@
 import SwiftUI
 
-// MARK: - 方向（8 向）
+// MARK: - 方向（8 向 + 圆形）
 enum GestureDirection: String, Codable, CaseIterable, Hashable {
     case up, down, left, right, upLeft, upRight, downLeft, downRight
+    /// 圆形手势（顺时针 / 逆时针），由转角和识别，不由 `from(dx:dy:)` 产生。
+    case circleClockwise, circleCounterClockwise
 
     var glyph: String {
         switch self {
         case .up: return "↑"; case .down: return "↓"; case .left: return "←"; case .right: return "→"
         case .upLeft: return "↖"; case .upRight: return "↗"; case .downLeft: return "↙"; case .downRight: return "↘"
+        case .circleClockwise: return "↻"; case .circleCounterClockwise: return "↺"
         }
     }
 
@@ -92,23 +95,50 @@ struct GestureRule: Identifiable, Codable, Hashable {
         .init(directions: [.up, .right], action: .tabs),
         .init(directions: [.up, .left], action: .menu),
         .init(directions: [.down, .up], action: .scrollTop),
+        .init(directions: [.circleClockwise], action: .reload),
     ]
 }
 
-// MARK: - 配置（含按钮启用与位置，整体持久化）
+// MARK: - 配置（含按钮启用、位置、灵敏度等，整体持久化）
 struct GestureConfig: Codable {
     var enabled: Bool = true
     /// 归一化位置 0...1
     var posX: Double = 0.93
     var posY: Double = 0.80
     var rules: [GestureRule] = GestureRule.defaults
+    /// 灵敏度 0.5(迟钝)…1.6(灵敏)：越大识别一段方向所需位移越小。
+    var sensitivity: Double = 1.0
+    /// 悬浮按钮大小倍率 0.8…1.4。
+    var buttonSize: Double = 1.0
+    /// 是否识别圆形手势。
+    var enableCircle: Bool = true
+    /// 命中时是否触觉反馈。
+    var haptics: Bool = true
+
+    /// 识别一段方向所需的最小位移（由灵敏度反推）。
+    var recognizeSegment: CGFloat { CGFloat(26.0 / max(0.4, sensitivity)) }
+
+    init() {}
+    /// 容错解码：旧配置缺新字段时用默认值，避免整份配置丢失。
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled      = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        posX         = try c.decodeIfPresent(Double.self, forKey: .posX) ?? 0.93
+        posY         = try c.decodeIfPresent(Double.self, forKey: .posY) ?? 0.80
+        rules        = try c.decodeIfPresent([GestureRule].self, forKey: .rules) ?? GestureRule.defaults
+        sensitivity  = try c.decodeIfPresent(Double.self, forKey: .sensitivity) ?? 1.0
+        buttonSize   = try c.decodeIfPresent(Double.self, forKey: .buttonSize) ?? 1.0
+        enableCircle = try c.decodeIfPresent(Bool.self, forKey: .enableCircle) ?? true
+        haptics      = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
+    }
 }
 
-// MARK: - 识别器：路径点 → 方向序列
+// MARK: - 识别器：路径点 → 方向序列（或圆形）
 enum GestureRecognizer {
-    /// segment：判定一段方向所需的最小位移
-    static func recognize(_ points: [CGPoint], segment: CGFloat = 26) -> [GestureDirection] {
+    /// segment：判定一段方向所需的最小位移；detectCircle：是否优先识别圆形。
+    static func recognize(_ points: [CGPoint], segment: CGFloat = 26, detectCircle: Bool = true) -> [GestureDirection] {
         guard points.count > 1 else { return [] }
+        if detectCircle, let circle = circle(points) { return [circle] }
         var result: [GestureDirection] = []
         var anchor = points[0]
         for p in points.dropFirst() {
@@ -119,5 +149,23 @@ enum GestureRecognizer {
             anchor = p
         }
         return result
+    }
+
+    /// 圆形识别：累计相邻线段的有符号转角，总转角接近 ±360° 即判为圆。
+    /// 屏幕坐标 y 向下，转角和 > 0 视觉为顺时针。
+    static func circle(_ points: [CGPoint], minTurnDegrees: CGFloat = 300) -> GestureDirection? {
+        guard points.count >= 10 else { return nil }
+        var totalTurn: CGFloat = 0
+        for i in 1..<(points.count - 1) {
+            let a = points[i - 1], b = points[i], c = points[i + 1]
+            let v1 = CGPoint(x: b.x - a.x, y: b.y - a.y)
+            let v2 = CGPoint(x: c.x - b.x, y: c.y - b.y)
+            guard hypot(v1.x, v1.y) > 1, hypot(v2.x, v2.y) > 1 else { continue }
+            let cross = v1.x * v2.y - v1.y * v2.x
+            let dot = v1.x * v2.x + v1.y * v2.y
+            totalTurn += atan2(cross, dot)
+        }
+        guard abs(totalTurn) * 180 / .pi >= minTurnDegrees else { return nil }
+        return totalTurn > 0 ? .circleClockwise : .circleCounterClockwise
     }
 }
