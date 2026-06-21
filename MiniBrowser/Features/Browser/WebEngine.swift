@@ -101,6 +101,31 @@ final class WebEngine: NSObject, ObservableObject {
         }
     }
 
+    /// 导出当前页为 PDF。
+    func exportPDF(_ completion: @escaping (Data?) -> Void) {
+        webView.createPDF { result in
+            completion((try? result.get()))
+        }
+    }
+
+    /// 读取当前页完整 HTML 源码。
+    func fetchHTML(_ completion: @escaping (String?) -> Void) {
+        webView.evaluateJavaScript("document.documentElement.outerHTML") { r, _ in
+            completion(r as? String)
+        }
+    }
+
+    /// 调起系统打印面板。
+    func printPage(jobName: String) {
+        let controller = UIPrintInteractionController.shared
+        let info = UIPrintInfo.printInfo()
+        info.outputType = .general
+        info.jobName = jobName.isEmpty ? "网页" : jobName
+        controller.printInfo = info
+        controller.printFormatter = webView.viewPrintFormatter()
+        controller.present(animated: true, completionHandler: nil)
+    }
+
     /// 读取页面当前选中的文本（用于划词浮层）；无选中返回空串。
     func fetchSelectedText(_ completion: @escaping (String) -> Void) {
         webView.evaluateJavaScript("window.getSelection().toString()") { result, _ in

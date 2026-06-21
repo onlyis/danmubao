@@ -72,6 +72,37 @@ struct ScriptEditView: View {
     }
 }
 
+// MARK: - 网页源码查看
+struct SourceCodeView: View {
+    @EnvironmentObject var vm: BrowserViewModel
+    @Environment(\.dismiss) private var dismiss
+    let code: String
+
+    var body: some View {
+        NavigationStack {
+            ScrollView([.vertical, .horizontal]) {
+                Text(code)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(Theme.Colors.primaryText)
+                    .textSelection(.enabled)
+                    .padding(Theme.Spacing.m)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Theme.Colors.groupedBackground.ignoresSafeArea())
+            .navigationTitle("网页源码").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("完成") { dismiss() } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        UIPasteboard.general.string = code
+                        vm.showToast("已复制源码", symbol: "doc.on.doc")
+                    } label: { Image(systemName: "doc.on.doc") }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - 开发者工具
 struct DevToolsView: View {
     private let tools: [(String, String, Color)] = [

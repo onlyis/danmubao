@@ -149,6 +149,62 @@ final class BrowserViewModel: ObservableObject {
     /// 看图模式：当前页面提取出的图片地址
     @Published var pageImages: [String] = []
 
+    /// 查看源码弹层
+    struct SourcePreview: Identifiable { let id = UUID(); let code: String }
+    @Published var sourcePreview: SourcePreview?
+
+    // MARK: - 网页导出 / 打印（基于当前 WKWebView）
+    /// 安全文件名（取标题或地址，去非法字符，限长）。
+    private func pageFileName(ext: String) -> String {
+        let raw = currentTitle.isEmpty ? currentURL : currentTitle
+        let cleaned = raw.components(separatedBy: CharacterSet(charactersIn: "/\\:*?\"<>|\n\t")).joined()
+        let base = cleaned.trimmingCharacters(in: .whitespaces).prefix(40)
+        return "\(base.isEmpty ? "page" : base).\(ext)"
+    }
+
+    private func writeToDownloads(_ data: Data, name: String, successSymbol: String) {
+        let url = DownloadManager.downloadsDirectory.appendingPathComponent(name)
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            do {
+                try data.write(to: url, options: .atomic)
+                Task { @MainActor in self?.showToast("已保存 \(name)", symbol: successSymbol) }
+            } catch {
+                Task { @MainActor in self?.showToast("保存失败", symbol: "exclamationmark.circle") }
+            }
+        }
+    }
+
+    func saveCurrentPDF() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        showToast("正在导出 PDF…", symbol: "doc.richtext")
+        let name = pageFileName(ext: "pdf")
+        engine.exportPDF { [weak self] data in
+            guard let data else { self?.showToast("导出失败", symbol: "exclamationmark.circle"); return }
+            self?.writeToDownloads(data, name: name, successSymbol: "doc.richtext")
+        }
+    }
+
+    func saveCurrentHTML() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        let name = pageFileName(ext: "html")
+        engine.fetchHTML { [weak self] html in
+            guard let data = html?.data(using: .utf8) else { self?.showToast("获取源码失败", symbol: "exclamationmark.circle"); return }
+            self?.writeToDownloads(data, name: name, successSymbol: "doc.plaintext")
+        }
+    }
+
+    func viewSource() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        engine.fetchHTML { [weak self] html in
+            self?.sourcePreview = SourcePreview(code: html ?? "（无法获取源码）")
+        }
+    }
+
+    func printCurrent() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        engine.printPage(jobName: currentTitle)
+    }
+
     init() {
         if let g = DiskStore.load(GestureConfig.self, from: "gestures.json") { gesture = g }
         if let e = DiskStore.load(SearchEngine.self, from: "search_engine.json") { searchEngine = e }

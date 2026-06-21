@@ -185,6 +185,7 @@ MiniBrowser/
 - **网站设置**：仅桌面版、夜间模式真实联动引擎；其余开关为本地 @State 占位。
 - **长按快捷操作 / 自定义菜单顺序 / 工具栏按钮自定义**：选择界面完整，但未真正改变按钮行为。
 - **下载触发**：✅ 网页内长按链接已可下载（`WebEngine` 的 `WKUIDelegate` 上下文菜单「下载链接」→ `DownloadManager.start`）；划词浮层改为读取真实选中文本（`fetchSelectedText`），无选中时让位给原生菜单，两者不再冲突。菜单「下载资源」入口仍保留。
+- **网页导出/打印**：✅ 保存 PDF（`WKWebView.createPDF`）、保存 HTML（`outerHTML`）、查看源码（`SourceCodeView` 弹层，可复制）、打印（`UIPrintInteractionController`）均已真实（菜单 page2 接 `vm.saveCurrentPDF/saveCurrentHTML/viewSource/printCurrent`，导出落地 `Documents/Downloads`）。WebArchive/长截图仍占位。
 - **大量设置项**：`PlaceholderSettings` 占位（主页设置、标签页、User-Agent、视频播放、文件管理、主题子项、导入导出书签、默认浏览器、添加到主屏幕、更新日志/隐私政策/用户协议等）。
 
 ---

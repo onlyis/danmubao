@@ -89,6 +89,10 @@ struct RootView: View {
         .overlay(alignment: .top) {
             if vm.showSelectionToolbar && vm.isBrowsing { SelectionToolbar() }
         }
+        // 网页源码查看
+        .sheet(item: $vm.sourcePreview) { preview in
+            SourceCodeView(code: preview.code)
+        }
         // 全局轻提示
         .overlay {
             if let toast = toasts.toast { ToastView(message: toast) }
