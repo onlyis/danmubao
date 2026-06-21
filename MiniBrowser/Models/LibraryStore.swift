@@ -5,8 +5,19 @@ import SwiftUI
 @MainActor
 final class LibraryStore: ObservableObject {
 
-    @Published var bookmarks: [Bookmark] = [] { didSet { persist(bookmarks, key: "bookmarks") } }
+    @Published var bookmarks: [Bookmark] = [] {
+        didSet { rebuildChildrenIndex(); persist(bookmarks, key: "bookmarks") }
+    }
     @Published var history: [HistorySection] = [] { didSet { persist(history, key: "history") } }
+
+    /// parentID → 直接子项 的索引。书签变更时 O(N) 重建一次，
+    /// 使 `children(of:)`/`childCount(of:)` 降为 O(1)——否则文件夹树渲染是 O(文件夹数 × 书签总数)。
+    private var childrenIndex: [UUID?: [Bookmark]] = [:]
+    private func rebuildChildrenIndex() {
+        var idx: [UUID?: [Bookmark]] = [:]
+        for b in bookmarks { idx[b.parentID, default: []].append(b) }   // 保序：与原 filter 结果顺序一致
+        childrenIndex = idx
+    }
 
     enum AddResult { case added, duplicate, empty }
 
@@ -31,6 +42,7 @@ final class LibraryStore: ObservableObject {
            let v = try? JSONDecoder().decode([Bookmark].self, from: d) { bookmarks = v }
         if let d = CloudSync.shared.pull("history"),
            let v = try? JSONDecoder().decode([HistorySection].self, from: d) { history = v }
+        rebuildChildrenIndex()   // init 中赋值不触发 didSet，显式建一次索引
     }
 
     /// 编码一次 → 本地落盘 + 推送 iCloud（应用远程变更时不回推）
@@ -89,13 +101,14 @@ final class LibraryStore: ObservableObject {
         bookmarks[i].parentID = parentID
     }
 
-    /// 某文件夹下的直接子项（parentID == nil 表示根目录）
+    /// 某文件夹下的直接子项（parentID == nil 表示根目录）。走索引，O(1)。
     func children(of parentID: UUID?) -> [Bookmark] {
-        bookmarks.filter { $0.parentID == parentID }
+        childrenIndex[parentID] ?? []
     }
 
+    /// 直接子项数量。走索引，O(1)（替代原先每个文件夹行各扫一遍全表）。
     func childCount(of folder: Bookmark) -> Int {
-        bookmarks.reduce(0) { $0 + ($1.parentID == folder.id ? 1 : 0) }
+        childrenIndex[folder.id]?.count ?? 0
     }
 
     /// 全部文件夹（用于「移动到…」选择）

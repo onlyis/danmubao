@@ -7,9 +7,20 @@ struct HistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
 
+    /// 按搜索词过滤历史（标题或网址命中），丢掉过滤后为空的分组。O(总条数)。
+    private var sections: [HistorySection] {
+        guard !search.isEmpty else { return library.history }
+        return library.history.compactMap { section in
+            let items = section.items.filter {
+                $0.title.localizedCaseInsensitiveContains(search) || $0.url.localizedCaseInsensitiveContains(search)
+            }
+            return items.isEmpty ? nil : HistorySection(id: section.id, title: section.title, items: items)
+        }
+    }
+
     var body: some View {
         List {
-            ForEach(library.history) { section in
+            ForEach(sections) { section in
                 Section(section.title) {
                     ForEach(section.items) { item in
                         Button { vm.open(url: item.url, title: item.title) } label: {
