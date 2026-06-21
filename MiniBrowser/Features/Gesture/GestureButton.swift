@@ -28,17 +28,11 @@ struct GestureButton: View {
                     trail
                     hud(in: geo.size)
                 }
-                if isDockedLine {
-                    // 贴边停靠：锁成一条边缘线（类似小米边缘手势条），按住拖出即画手势
-                    dockedLine
-                        .position(dockedLinePosition(in: geo.size))
-                        .gesture(drag(in: geo.size))
-                } else {
-                    button
-                        .opacity(restingOpacity(in: geo.size))
-                        .position(center(in: geo.size))
-                        .gesture(drag(in: geo.size))
-                }
+                // 单一稳定容器承载手势：线/按钮只切透明度（不切换视图），
+                // 这样从边缘起手时手势不会被视图替换打断，边缘也能正常画手势。
+                handle
+                    .position(handlePosition(in: geo.size))
+                    .gesture(drag(in: geo.size))
             }
             .coordinateSpace(name: coordSpace)
         }
@@ -84,32 +78,43 @@ struct GestureButton: View {
         }
     }
 
-    /// 悬浮模式、空闲、且贴到左右边缘 → 锁成边缘线。
-    private var isDockedLine: Bool {
-        phase == .idle && vm.gesture.placement == .floating
+    /// 悬浮模式、贴到左右边缘、且非移动态 → 显示为边缘线（移动态显示按钮以便重定位）。
+    private var dockedNow: Bool {
+        phase != .moving && vm.gesture.placement == .floating
             && (vm.gesture.posX < 0.06 || vm.gesture.posX > 0.94)
     }
-    /// 边缘手势线：细线可见，但触摸感应区放大（避免与系统边缘手势冲突、更易抓住）
+    /// 单一稳定手势容器：线与按钮都常驻、仅切透明度，避免拖动中视图替换打断手势。
+    private var handle: some View {
+        ZStack {
+            button.opacity(dockedNow ? 0 : 1)
+            dockedLine.opacity(dockedNow ? 1 : 0)
+        }
+        .frame(width: dockedNow ? 40 : radius * 2, height: dockedNow ? 110 : radius * 2)
+        .contentShape(Rectangle())   // 边缘线感应区放大，更易抓、减少与系统手势冲突
+    }
+    /// 边缘手势线（紧贴边缘的细线）
     private var dockedLine: some View {
         Capsule()
             .fill(Theme.Colors.accent.opacity(0.75))
             .frame(width: 5, height: 56)
             .shadow(color: .black.opacity(0.15), radius: 2)
-            .frame(width: 36, height: 100)   // 更大的手指感应区
-            .contentShape(Rectangle())
     }
-    private func dockedLinePosition(in size: CGSize) -> CGPoint {
-        // 让可见细线贴边，同时感应区向内延伸
-        let x: CGFloat = vm.gesture.posX < 0.5 ? 12 : size.width - 12
-        let y = min(max(vm.gesture.posY * size.height, 70), size.height - 70)
-        return CGPoint(x: x, y: y)
-    }
-
-    /// 停靠在边缘且空闲时半透明（露一部分在视野内）。
-    private func restingOpacity(in size: CGSize) -> CGFloat {
-        guard phase == .idle, vm.gesture.placement == .floating else { return 1 }
-        let x = vm.gesture.posX * size.width
-        return (x < radius || x > size.width - radius) ? 0.5 : 1
+    private func handlePosition(in size: CGSize) -> CGPoint {
+        // 工具栏图标：定位到 .gesture 在工具栏中的等分槽位
+        if inToolbar, let idx = vm.toolbarItems.firstIndex(of: .gesture) {
+            let count = max(vm.toolbarItems.count, 1)
+            let x = (CGFloat(idx) + 0.5) / CGFloat(count) * size.width
+            let y = size.height - Self.safeBottomInset - Theme.Size.toolbarHeight / 2
+            return CGPoint(x: x, y: y)
+        }
+        if dockedNow {
+            // 细线紧贴边缘；感应区向内延伸
+            let x: CGFloat = vm.gesture.posX < 0.5 ? 8 : size.width - 8
+            let y = min(max(vm.gesture.posY * size.height, 70), size.height - 70)
+            return CGPoint(x: x, y: y)
+        }
+        if phase == .moving, let livePos { return clamp(livePos, in: size) }
+        return clamp(CGPoint(x: vm.gesture.posX * size.width, y: vm.gesture.posY * size.height), in: size)
     }
 
     // MARK: - 轨迹
@@ -152,17 +157,6 @@ struct GestureButton: View {
     }
 
     // MARK: - 位置
-    private func center(in size: CGSize) -> CGPoint {
-        // 工具栏图标：定位到 .gesture 在工具栏中的槽位（等分），不可移动
-        if inToolbar, let idx = vm.toolbarItems.firstIndex(of: .gesture) {
-            let count = max(vm.toolbarItems.count, 1)
-            let x = (CGFloat(idx) + 0.5) / CGFloat(count) * size.width
-            let y = size.height - Self.safeBottomInset - Theme.Size.toolbarHeight / 2
-            return CGPoint(x: x, y: y)
-        }
-        if phase == .moving, let livePos { return clamp(livePos, in: size) }
-        return clamp(CGPoint(x: vm.gesture.posX * size.width, y: vm.gesture.posY * size.height), in: size)
-    }
     /// 悬浮模式：水平允许约 60% 拖出边缘（保留一部分在视野内），竖直留常规边距。
     private func clamp(_ p: CGPoint, in size: CGSize) -> CGPoint {
         let mx = radius * 0.4
