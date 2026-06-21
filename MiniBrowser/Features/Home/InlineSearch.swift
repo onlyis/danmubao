@@ -27,7 +27,7 @@ struct InlineSearchView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Theme.Colors.accent)
                     .padding(.horizontal, 14)
-                    .frame(height: 52)
+                    .frame(height: 42)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -39,11 +39,11 @@ struct InlineSearchView: View {
                     }
                 }
                 .padding(.trailing, 12)
-                .padding(.vertical, 6)
+                .padding(.vertical, 5)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Colors.card)   // 普通白色背景，无玻璃特效
+        .background(Theme.Colors.background)   // 整条栏=项目灰底
         .overlay(alignment: .top) { Rectangle().fill(Theme.Colors.separator).frame(height: Theme.Size.hairline) }
     }
 
@@ -61,29 +61,25 @@ struct InlineSearchView: View {
         if !q.isEmpty { submit(q) }
     }
 
-    /// URL 片段小卡（白底圆角）
+    /// URL 片段小卡（白底，几乎不可见的圆角）
     private func urlChip(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 15))
             .foregroundStyle(Theme.Colors.primaryText)
-            .padding(.horizontal, 14)
-            .frame(height: 40)
-            .background(Theme.Colors.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Theme.Colors.separator, lineWidth: 0.5))
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(Theme.Colors.card, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 
-    /// 引擎方卡：未选=浅底品牌色字；选中=品牌色底白字（参考图样式）
+    /// 引擎方卡：未选=白底品牌色字；选中=品牌色底白字（参考图样式）
     private func engineChip(_ e: SearchEngine) -> some View {
         let selected = e.id == vm.searchEngine.id
         return Text(e.glyph)
-            .font(.system(size: 16, weight: .bold, design: .rounded))
+            .font(.system(size: 15, weight: .bold, design: .rounded))
             .foregroundStyle(selected ? .white : e.color)
-            .frame(width: 40, height: 40)
-            .background(selected ? AnyShapeStyle(e.color) : AnyShapeStyle(Theme.Colors.background),
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Theme.Colors.separator, lineWidth: selected ? 0 : 0.5))
+            .frame(width: 34, height: 32)
+            .background(selected ? AnyShapeStyle(e.color) : AnyShapeStyle(Theme.Colors.card),
+                        in: RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 }
 
