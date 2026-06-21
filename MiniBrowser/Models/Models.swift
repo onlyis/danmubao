@@ -1,15 +1,16 @@
 import SwiftUI
 
 // MARK: - 快捷网站
-struct QuickLink: Identifiable, Hashable {
-    let id = UUID()
+struct QuickLink: Identifiable, Hashable, Codable {
+    var id = UUID()
     var title: String
     var url: String
     /// 站点图标显示用的短字（无品牌资产时退化为首字 / 字母）
     var glyph: String
-    var color: Color
+    var colorHex: UInt
     /// 可选 SF Symbol（部分内置入口用图标而非文字）
     var symbol: String? = nil
+    var color: Color { Color(hex: colorHex) }
 }
 
 // MARK: - 搜索引擎

@@ -19,6 +19,8 @@ final class WebEngine: NSObject, ObservableObject {
 
     /// 长按链接时通过原生上下文菜单请求下载（由视图层接到 DownloadManager）。
     var onRequestDownload: ((URL) -> Void)?
+    /// 长按链接「在后台打开」回调。
+    var onOpenInBackground: ((URL) -> Void)?
 
     /// 会话状态：完整的前进/后退列表 + 当前页 + 滚动位置（`WKWebView.interactionState`, iOS 15+）。
     /// 用于引擎被 LRU 池回收后重建时无损恢复——避免丢失历史或从头加载页面。
@@ -193,11 +195,15 @@ extension WebEngine: WKUIDelegate {
                  completionHandler: @escaping (UIContextMenuConfiguration?) -> Void) {
         guard let url = elementInfo.linkURL else { completionHandler(nil); return }
         let config = UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] suggested in
+            let background = UIAction(title: "在后台打开",
+                                      image: UIImage(systemName: "rectangle.stack.badge.plus")) { _ in
+                self?.onOpenInBackground?(url)
+            }
             let download = UIAction(title: "下载链接",
                                     image: UIImage(systemName: "arrow.down.circle")) { _ in
                 self?.onRequestDownload?(url)
             }
-            return UIMenu(title: url.absoluteString, children: suggested + [download])
+            return UIMenu(title: url.absoluteString, children: suggested + [background, download])
         }
         completionHandler(config)
     }

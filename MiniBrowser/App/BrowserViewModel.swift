@@ -108,7 +108,18 @@ final class BrowserViewModel: ObservableObject {
     }
 
     // MARK: - 数据
-    @Published var quickLinks: [QuickLink] = SampleData.quickLinks
+    @Published var quickLinks: [QuickLink] = SampleData.quickLinks {
+        didSet { DiskStore.save(quickLinks, to: "quicklinks.json") }
+    }
+    /// 新增快捷网站（持久化）
+    func addQuickLink(title: String, url: String) {
+        let u = url.trimmingCharacters(in: .whitespaces)
+        guard !u.isEmpty else { return }
+        let name = title.trimmingCharacters(in: .whitespaces).isEmpty ? u : title.trimmingCharacters(in: .whitespaces)
+        let palette: [UInt] = [0x2932E1, 0xFB6022, 0x34C759, 0xFF375F, 0xAF52DE, 0xFF9500, 0x0A84FF]
+        quickLinks.append(QuickLink(title: name, url: u, glyph: String(name.prefix(1)).uppercased(),
+                                    colorHex: palette[quickLinks.count % palette.count]))
+    }
     /// 书签 + 历史拆到独立存储层（见 LibraryStore）
     let library = LibraryStore()
 
@@ -162,6 +173,11 @@ final class BrowserViewModel: ObservableObject {
 
     /// 看图模式：当前页面提取出的图片地址
     @Published var pageImages: [String] = []
+
+    /// 网址导航分类的展开状态（默认全展开，记住用户操作并持久化）
+    @Published var navExpanded: Set<String> = Set(NavCatalog.categories.map(\.title)) {
+        didSet { DiskStore.save(Array(navExpanded), to: "nav_expanded.json") }
+    }
 
     /// 新建标签时自增，触发主体页面从左下角弹出的动画（RootView 观察）
     @Published private(set) var pagePopTrigger = 0
@@ -233,6 +249,8 @@ final class BrowserViewModel: ObservableObject {
         if let c = DiskStore.load([SearchEngine].self, from: "custom_engines.json") { customEngines = c }
         if let t = DiskStore.load([ToolbarItemKind].self, from: "toolbar.json") { toolbarItems = t }
         if let sh = DiskStore.load([String].self, from: "search_history.json") { searchHistory = sh }
+        if let ne = DiskStore.load([String].self, from: "nav_expanded.json") { navExpanded = Set(ne) }
+        if let ql = DiskStore.load([QuickLink].self, from: "quicklinks.json") { quickLinks = ql }
         // 不变式校正：gesture ∈ toolbarItems ⟺ 放置方式为工具栏（防旧数据不一致导致空槽）
         let gestureInToolbar = toolbarItems.contains(.gesture)
         if (gesture.placement == .toolbar) != gestureInToolbar {
@@ -393,6 +411,26 @@ final class BrowserViewModel: ObservableObject {
         isBrowsing = false
     }
 
+    /// 在后台新标签打开链接（不切换当前标签）
+    func openInBackground(url: String) {
+        let u = url.trimmingCharacters(in: .whitespaces)
+        guard !u.isEmpty else { return }
+        let tab = Tab(isHome: false, isIncognito: isIncognito)
+        tabIndex[tab.id] = tab
+        // 插到当前标签之后
+        if isIncognito {
+            let i = (incognitoTabs.firstIndex { $0.id == currentTabID }).map { $0 + 1 } ?? incognitoTabs.count
+            incognitoTabs.insert(tab, at: min(i, incognitoTabs.count))
+        } else {
+            let i = (tabs.firstIndex { $0.id == currentTabID }).map { $0 + 1 } ?? tabs.count
+            tabs.insert(tab, at: min(i, tabs.count))
+        }
+        tab.load(u, searchTemplate: searchTemplate)
+        if !isIncognito { library.recordHistory(title: u, url: u) }
+        showToast("已在后台打开", symbol: "rectangle.stack.badge.plus")
+        scheduleTabPersist()
+    }
+
     /// 截取当前标签缩略图（打开标签管理前调用）
     func captureCurrentThumbnail() { currentTab?.captureThumbnail() }
 
@@ -499,18 +537,18 @@ final class BrowserViewModel: ObservableObject {
 // MARK: - 示例数据
 enum SampleData {
     static let quickLinks: [QuickLink] = [
-        .init(title: "百度", url: "baidu.com", glyph: "百", color: Color(hex: 0x2932E1)),
-        .init(title: "搜狗", url: "sogou.com", glyph: "搜", color: Color(hex: 0xFB6022)),
-        .init(title: "Google", url: "google.com", glyph: "G", color: Color(hex: 0x4285F4)),
-        .init(title: "Bing", url: "bing.com", glyph: "b", color: Color(hex: 0x008373)),
-        .init(title: "神马搜索", url: "sm.cn", glyph: "神", color: Color(hex: 0xFF7A00)),
-        .init(title: "360搜索", url: "so.com", glyph: "360", color: Color(hex: 0x10B266)),
-        .init(title: "优酷", url: "youku.com", glyph: "优", color: Color(hex: 0x1AA1E1)),
-        .init(title: "腾讯视频", url: "v.qq.com", glyph: "腾", color: Color(hex: 0xFF9B00)),
-        .init(title: "微博", url: "weibo.com", glyph: "微", color: Color(hex: 0xE6162D)),
-        .init(title: "网址导航", url: "hao123.com", glyph: "", color: Color(hex: 0x0A84FF), symbol: "safari.fill"),
-        .init(title: "知乎", url: "zhihu.com", glyph: "知", color: Color(hex: 0x0066FF)),
-        .init(title: "B站", url: "bilibili.com", glyph: "B", color: Color(hex: 0xFB7299)),
+        .init(title: "百度", url: "baidu.com", glyph: "百", colorHex: 0x2932E1),
+        .init(title: "搜狗", url: "sogou.com", glyph: "搜", colorHex: 0xFB6022),
+        .init(title: "Google", url: "google.com", glyph: "G", colorHex: 0x4285F4),
+        .init(title: "Bing", url: "bing.com", glyph: "b", colorHex: 0x008373),
+        .init(title: "神马搜索", url: "sm.cn", glyph: "神", colorHex: 0xFF7A00),
+        .init(title: "360搜索", url: "so.com", glyph: "360", colorHex: 0x10B266),
+        .init(title: "优酷", url: "youku.com", glyph: "优", colorHex: 0x1AA1E1),
+        .init(title: "腾讯视频", url: "v.qq.com", glyph: "腾", colorHex: 0xFF9B00),
+        .init(title: "微博", url: "weibo.com", glyph: "微", colorHex: 0xE6162D),
+        .init(title: "网址导航", url: "hao123.com", glyph: "", colorHex: 0x0A84FF, symbol: "safari.fill"),
+        .init(title: "知乎", url: "zhihu.com", glyph: "知", colorHex: 0x0066FF),
+        .init(title: "B站", url: "bilibili.com", glyph: "B", colorHex: 0xFB7299),
     ]
 
     @MainActor static func makeTabs() -> [Tab] {

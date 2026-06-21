@@ -62,19 +62,19 @@ enum NavCatalog {
 struct NavDirectoryView: View {
     @EnvironmentObject var vm: BrowserViewModel
     var lightText: Bool = false
-    @State private var expanded: Set<String> = ["常用"]   // 默认展开第一个
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 5)
 
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
                 ForEach(NavCatalog.categories) { cat in
+                    let expanded = vm.navExpanded.contains(cat.title)
                     VStack(spacing: 0) {
                         Button {
                             Haptics.light()
                             withAnimation(.easeInOut(duration: 0.22)) {
-                                if expanded.contains(cat.title) { expanded.remove(cat.title) }
-                                else { expanded.insert(cat.title) }
+                                if expanded { vm.navExpanded.remove(cat.title) }
+                                else { vm.navExpanded.insert(cat.title) }
                             }
                         } label: {
                             HStack {
@@ -85,7 +85,7 @@ struct NavDirectoryView: View {
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.tertiaryText)
-                                    .rotationEffect(.degrees(expanded.contains(cat.title) ? 0 : -90))
+                                    .rotationEffect(.degrees(expanded ? 0 : -90))
                             }
                             .padding(.horizontal, 14)
                             .frame(height: 46)
@@ -93,7 +93,7 @@ struct NavDirectoryView: View {
                         }
                         .buttonStyle(.plain)
 
-                        if expanded.contains(cat.title) {
+                        if expanded {
                             LazyVGrid(columns: columns, spacing: 14) {
                                 ForEach(cat.sites) { site in
                                     Button { Haptics.light(); vm.open(url: site.url, title: site.name) } label: {

@@ -12,7 +12,6 @@ struct InlineSearchView: View {
             SearchInputField(query: $query, onSubmit: submit, onCancel: onCancel)
                 .padding(.horizontal, Theme.Spacing.l)
                 .padding(.vertical, Theme.Spacing.s)
-            SearchEngineRow()
             SearchSuggestionList(query: query, onPick: submit)
         }
         .background(Theme.Colors.background.ignoresSafeArea())
@@ -49,7 +48,15 @@ private struct SearchInputField: View {
                         ToolbarItemGroup(placement: .keyboard) {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    ForEach(["https://", "www.", ".com", ".cn", ".net", "/"], id: \.self) { frag in
+                                    // 搜索引擎：随手在输入法上方选择（图标 only，小，无边框，小圆角）
+                                    ForEach(vm.allSearchEngines) { e in
+                                        Button { Haptics.light(); vm.searchEngine = e } label: {
+                                            SiteIcon(glyph: e.glyph, color: e.color, size: 30, corner: 7)
+                                                .opacity(e.id == vm.searchEngine.id ? 1 : 0.55)
+                                        }
+                                    }
+                                    Divider().frame(height: 22)
+                                    ForEach(["https://", ".com", ".cn", "/"], id: \.self) { frag in
                                         Button(frag) { query += frag }
                                             .font(.system(size: 14, weight: .medium))
                                             .buttonStyle(.bordered).controlSize(.small)
@@ -81,37 +88,8 @@ private struct SearchInputField: View {
     }
 }
 
-/// 搜索引擎图标行：点击切换默认引擎。
-struct SearchEngineRow: View {
-    @EnvironmentObject var vm: BrowserViewModel
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(vm.allSearchEngines) { e in
-                    let isSel = e.id == vm.searchEngine.id
-                    Button { Haptics.light(); vm.searchEngine = e } label: {
-                        VStack(spacing: 4) {
-                            SiteIcon(glyph: e.glyph, color: e.color, size: 40, corner: 11)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                        .strokeBorder(Theme.Colors.accent, lineWidth: isSel ? 2.5 : 0)
-                                )
-                            Text(e.name).font(.system(size: 10))
-                                .foregroundStyle(isSel ? Theme.Colors.accent : Theme.Colors.secondaryText)
-                                .lineLimit(1)
-                        }
-                        .frame(width: 54)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.l).padding(.vertical, Theme.Spacing.s)
-        }
-        .frame(height: 74)
-    }
-}
-
-/// 搜索内容区：搜索历史 chips + 剪贴板 + 历史记录(favicon+URL) + 搜索建议。
+/// 搜索内容区：扁平无卡片边框，顶到页面边缘只留小边距。
+/// 搜索历史 chips + 剪贴板 + 历史记录(favicon+URL) + 搜索建议。
 struct SearchSuggestionList: View {
     @EnvironmentObject var vm: BrowserViewModel
     let query: String
@@ -133,37 +111,31 @@ struct SearchSuggestionList: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                if query.isEmpty && !vm.searchHistory.isEmpty {
-                    chipsSection
-                }
+            VStack(alignment: .leading, spacing: 14) {
+                if query.isEmpty && !vm.searchHistory.isEmpty { chipsSection }
+
                 if hasClipURL {
-                    sectionCard {
-                        Button {
-                            if let u = UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string { onPick(u) }
-                        } label: {
-                            rowLabel(icon: "doc.on.clipboard", title: "打开剪贴板中的网址", subtitle: nil, accent: true)
-                        }
+                    Button {
+                        if let u = UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string { onPick(u) }
+                    } label: {
+                        rowLabel(icon: "doc.on.clipboard", title: "打开剪贴板中的网址", accent: true)
                     }
                 }
+
                 if !historyItems.isEmpty {
-                    section(query.isEmpty ? "历史记录" : "相关历史") {
-                        ForEach(Array(historyItems.enumerated()), id: \.element.id) { i, item in
-                            Button { onPick(item.url) } label: { historyRow(item) }
-                            if i < historyItems.count - 1 { rowDivider }
-                        }
+                    sectionHeader(query.isEmpty ? "历史记录" : "相关历史")
+                    ForEach(historyItems) { item in
+                        Button { onPick(item.url) } label: { historyRow(item) }
                     }
                 }
-                section("搜索建议") {
-                    ForEach(Array(suggestions.enumerated()), id: \.offset) { i, s in
-                        Button { onPick(s) } label: {
-                            rowLabel(icon: "magnifyingglass", title: s, subtitle: nil, accent: false)
-                        }
-                        if i < suggestions.count - 1 { rowDivider }
-                    }
+
+                sectionHeader("搜索建议")
+                ForEach(Array(suggestions.enumerated()), id: \.offset) { _, s in
+                    Button { onPick(s) } label: { rowLabel(icon: "magnifyingglass", title: s, accent: false) }
                 }
             }
-            .padding(Theme.Spacing.l)
+            .padding(.horizontal, 16)   // 顶到边缘留小边距
+            .padding(.vertical, 8)
         }
         .scrollDismissesKeyboard(.interactively)
     }
@@ -190,29 +162,18 @@ struct SearchSuggestionList: View {
         }
     }
 
-    @ViewBuilder private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.Colors.secondaryText)
-                .padding(.leading, 4)
-            sectionCard { VStack(spacing: 0) { content() } }
-        }
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.Colors.secondaryText)
+            .padding(.top, 6)
     }
-    @ViewBuilder private func sectionCard<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        VStack(spacing: 0) { content() }
-            .padding(.horizontal, 14).padding(.vertical, 4)
-            .background(Theme.Colors.card, in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
-    }
-    private var rowDivider: some View {
-        Rectangle().fill(Theme.Colors.separator).frame(height: Theme.Size.hairline).padding(.leading, 34)
-    }
-    private func rowLabel(icon: String, title: String, subtitle: String?, accent: Bool) -> some View {
+    private func rowLabel(icon: String, title: String, accent: Bool) -> some View {
         HStack(spacing: Theme.Spacing.m) {
             Image(systemName: icon).font(.system(size: 15))
                 .foregroundStyle(accent ? Theme.Colors.accent : Theme.Colors.tertiaryText).frame(width: 22)
             Text(title).font(.system(size: 15)).foregroundStyle(Theme.Colors.primaryText).lineLimit(1)
             Spacer()
         }
-        .frame(height: 44)
+        .frame(height: 40)
     }
     private func historyRow(_ item: HistoryItem) -> some View {
         HStack(spacing: Theme.Spacing.m) {
@@ -223,7 +184,7 @@ struct SearchSuggestionList: View {
             }
             Spacer()
         }
-        .frame(height: 52)
+        .frame(height: 48)
     }
 }
 

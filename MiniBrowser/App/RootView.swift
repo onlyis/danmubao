@@ -44,7 +44,7 @@ struct RootView: View {
             .scaleEffect(pagePop, anchor: .bottomLeading)   // 新建标签：从左下角弹出（快）
             .onChange(of: vm.pagePopTrigger) { _, _ in
                 pagePop = 0.1
-                withAnimation(.spring(response: 0.15, dampingFraction: 0.72)) { pagePop = 1 }
+                withAnimation(.spring(response: 0.08, dampingFraction: 0.7)) { pagePop = 1 }
             }
 
             // 底部固定工具栏（主页态不创建引擎）
@@ -61,11 +61,10 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
         }
-        // 标签页管理：用覆盖层 + 淡入淡出（就地消失，不向下缩）
+        // 标签页管理：覆盖层瞬时显示/消失（不显示标签淡出动画，只看新页面弹出）
         .overlay {
-            if vm.showTabs { TabsView().transition(.opacity).zIndex(20) }
+            if vm.showTabs { TabsView().zIndex(20) }
         }
-        .animation(.easeInOut(duration: 0.18), value: vm.showTabs)
         // 网站设置面板
         .sheet(isPresented: $vm.showWebsiteSettings) {
             WebsiteSettingsSheet()

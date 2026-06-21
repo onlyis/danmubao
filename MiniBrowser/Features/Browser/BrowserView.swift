@@ -42,6 +42,7 @@ private struct BrowserContent: View {
                 manager.start(urlString: url.absoluteString)
                 vm?.showToast("开始下载…", symbol: "arrow.down.circle")
             }
+            engine.onOpenInBackground = { [weak vm] url in vm?.openInBackground(url: url.absoluteString) }
         }
         .onChange(of: vm.isDesktopMode) { _, on in engine.setDesktop(on) }
         .onChange(of: vm.isNightMode) { _, on in engine.applyNight(on) }

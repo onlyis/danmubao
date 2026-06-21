@@ -5,6 +5,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var vm: BrowserViewModel
     @State private var homePage = 0
+    @State private var showAddLink = false
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
     private var lightText: Bool { vm.wallpaper != .none && vm.wallpaper.prefersLightText }
@@ -32,11 +33,42 @@ struct HomeView: View {
                 ForEach(vm.quickLinks) { link in
                     QuickLinkCell(link: link, lightText: lightText)
                 }
-                AddQuickLinkCell()
+                Button { showAddLink = true } label: { AddQuickLinkCell(lightText: lightText) }
+                    .buttonStyle(PressableStyle())
             }
             .padding(.horizontal, Theme.Spacing.l)
             Spacer(minLength: 80)
         }
+        .sheet(isPresented: $showAddLink) { AddQuickLinkSheet() }
+    }
+}
+
+/// 添加快捷网站
+private struct AddQuickLinkSheet: View {
+    @EnvironmentObject var vm: BrowserViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var url = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("名称") { TextField("名称（可选）", text: $name) }
+                Section("网址") {
+                    TextField("example.com", text: $url)
+                        .autocorrectionDisabled().textInputAutocapitalization(.never).keyboardType(.URL)
+                }
+            }
+            .navigationTitle("添加快捷网站").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("添加") { vm.addQuickLink(title: name, url: url); dismiss() }
+                        .fontWeight(.semibold).disabled(url.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.height(260)])
     }
 }
 
@@ -107,19 +139,21 @@ struct QuickLinkCell: View {
 
 /// 添加快捷入口
 private struct AddQuickLinkCell: View {
+    var lightText: Bool = false
     var body: some View {
         VStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Theme.Colors.separator, style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
+                .strokeBorder(lightText ? Color.white.opacity(0.5) : Theme.Colors.separator,
+                              style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
                 .frame(width: Theme.Size.quickLinkIcon, height: Theme.Size.quickLinkIcon)
                 .overlay {
                     Image(systemName: "plus")
                         .font(.system(size: 24, weight: .light))
-                        .foregroundStyle(Theme.Colors.tertiaryText)
+                        .foregroundStyle(lightText ? .white : Theme.Colors.tertiaryText)
                 }
             Text("添加")
                 .font(.system(size: 12))
-                .foregroundStyle(Theme.Colors.tertiaryText)
+                .foregroundStyle(lightText ? .white : Theme.Colors.tertiaryText)
         }
     }
 }
