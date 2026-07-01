@@ -20,7 +20,8 @@ enum DiskStore {
             do {
                 try data.write(to: target, options: .atomic)
             } catch {
-                assertionFailure("DiskStore 写入失败 file=\(name) error=\(error)")
+                // 写盘失败必须暴露：Release 下 assertionFailure 是 no-op 会导致静默丢数据。
+                NSLog("[DiskStore] 写入失败 file=%@ error=%@", name, String(describing: error))
             }
         }
     }
@@ -34,7 +35,8 @@ enum DiskStore {
                 let data = try JSONEncoder().encode(value)
                 try data.write(to: target, options: .atomic)
             } catch {
-                assertionFailure("DiskStore 异步保存失败 file=\(name) error=\(error)")
+                // 编码或写盘失败必须暴露：Release 下 assertionFailure 是 no-op 会导致静默丢数据。
+                NSLog("[DiskStore] 异步保存失败 file=%@ error=%@", name, String(describing: error))
             }
         }
     }
@@ -45,7 +47,8 @@ enum DiskStore {
         do {
             data = try JSONEncoder().encode(value)
         } catch {
-            assertionFailure("DiskStore 编码失败 file=\(name) error=\(error)")
+            // 编码失败必须暴露：Release 下 assertionFailure 是 no-op 会导致静默丢数据。
+            NSLog("[DiskStore] 编码失败 file=%@ error=%@", name, String(describing: error))
             return
         }
         let target = url(name)
@@ -53,8 +56,9 @@ enum DiskStore {
             do {
                 try data.write(to: target, options: .atomic)
             } catch {
-                // 持久化失败不应中断 UI，但需暴露问题上下文
-                assertionFailure("DiskStore 写入失败 file=\(name) error=\(error)")
+                // 持久化失败不应中断 UI，但需暴露问题上下文；
+                // Release 下 assertionFailure 是 no-op 会导致静默丢数据。
+                NSLog("[DiskStore] 写入失败 file=%@ error=%@", name, String(describing: error))
             }
         }
     }

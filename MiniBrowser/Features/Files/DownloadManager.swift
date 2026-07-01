@@ -47,7 +47,11 @@ final class DownloadManager: NSObject, ObservableObject {
     nonisolated static let downloadsDirectory: URL = {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Downloads", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            NSLog("[DownloadManager] 创建下载目录失败 path=%@ error=%@", dir.path, String(describing: error))
+        }
         return dir
     }()
 
@@ -56,8 +60,7 @@ final class DownloadManager: NSObject, ObservableObject {
 
     /// 由用户输入的地址归一化后开始下载
     func start(urlString: String) {
-        let normalized = urlString.hasPrefix("http") ? urlString : "https://" + urlString
-        guard let url = URL(string: normalized), url.host != nil else {
+        guard let url = urlString.asWebURL(), url.host != nil else {
             assertionFailure("无效的下载地址: \(urlString)")
             return
         }
@@ -93,7 +96,13 @@ final class DownloadManager: NSObject, ObservableObject {
 
     func remove(_ dl: LiveDownload) {
         dl.task?.cancel()
-        if let url = dl.localURL { try? FileManager.default.removeItem(at: url) }
+        if let url = dl.localURL {
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                NSLog("[DownloadManager] 删除下载文件失败 path=%@ error=%@", url.path, String(describing: error))
+            }
+        }
         downloads.removeAll { $0.id == dl.id }
     }
 
@@ -211,24 +220,29 @@ enum FileStore {
 
     static func delete(name: String, in directory: URL = DownloadManager.downloadsDirectory) {
         let url = directory.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: url)
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            NSLog("[FileStore] 删除文件失败 path=%@ error=%@", url.path, String(describing: error))
+        }
     }
 
-    /// 重命名（真实 moveItem）
+    /// 重命名（真实 moveItem）。新名字经 sanitize 净化，避免 ../ 目录穿越。
     static func rename(_ name: String, to newName: String,
                        in directory: URL = DownloadManager.downloadsDirectory) throws {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != name else { return }
+        let safe = WiFiTransferServer.sanitize(trimmed)
         let src = directory.appendingPathComponent(name)
-        let dest = directory.appendingPathComponent(trimmed)
+        let dest = directory.appendingPathComponent(safe)
         try FileManager.default.moveItem(at: src, to: dest)
     }
 
-    /// 移动到子文件夹（folder 为 nil 表示移回根目录）
+    /// 移动到子文件夹（folder 为 nil 表示移回根目录）。目标文件夹名经 sanitize 净化，避免 ../ 目录穿越。
     static func move(_ name: String, toFolder folder: String?,
                      in directory: URL = DownloadManager.downloadsDirectory) throws {
         let src = directory.appendingPathComponent(name)
-        let destDir = folder.map { directory.appendingPathComponent($0, isDirectory: true) } ?? directory
+        let destDir = folder.map { directory.appendingPathComponent(WiFiTransferServer.sanitize($0), isDirectory: true) } ?? directory
         try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
         let dest = destDir.appendingPathComponent(name)
         guard src.standardizedFileURL != dest.standardizedFileURL else { return }
@@ -240,12 +254,13 @@ enum FileStore {
         list(directory).filter(\.isFolder).map(\.name)
     }
 
-    /// 新建文件夹
+    /// 新建文件夹。名字经 sanitize 净化，避免 ../ 目录穿越。
     static func createFolder(_ name: String,
                              in directory: URL = DownloadManager.downloadsDirectory) throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        try FileManager.default.createDirectory(at: directory.appendingPathComponent(trimmed, isDirectory: true),
+        let safe = WiFiTransferServer.sanitize(trimmed)
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent(safe, isDirectory: true),
                                                 withIntermediateDirectories: true)
     }
 

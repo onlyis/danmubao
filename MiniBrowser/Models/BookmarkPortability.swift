@@ -12,7 +12,8 @@ extension LibraryStore {
     func exportHTML() -> URL? {
         let html = Self.netscapeHTML(from: bookmarks)
         guard let data = html.data(using: .utf8) else {
-            assertionFailure("书签导出：HTML 编码失败")
+            // Release 下 assertionFailure 是 no-op，会导致导出静默失败。
+            NSLog("[BookmarkPortability] 书签导出 HTML 编码失败 count=%d", bookmarks.count)
             return nil
         }
         let name = "bookmarks-\(Self.exportStamp.string(from: Date())).html"
@@ -21,7 +22,8 @@ extension LibraryStore {
             try data.write(to: dest, options: .atomic)
             return dest
         } catch {
-            assertionFailure("书签导出写盘失败 dest=\(dest.path) error=\(error)")
+            // Release 下 assertionFailure 是 no-op，会导致导出静默失败。
+            NSLog("[BookmarkPortability] 书签导出写盘失败 dest=%@ error=%@", dest.path, String(describing: error))
             return nil
         }
     }
@@ -86,7 +88,8 @@ extension LibraryStore {
         guard let data = try? Data(contentsOf: url),
               // 多数书签文件是 UTF-8；个别旧导出用 GBK/Latin1，退化到 isoLatin1 以免整体读不出。
               let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
-            assertionFailure("书签导入：无法读取文件 \(url.path)")
+            // Release 下 assertionFailure 是 no-op，会导致导入静默失败。
+            NSLog("[BookmarkPortability] 书签导入无法读取文件 path=%@", url.path)
             return 0
         }
 

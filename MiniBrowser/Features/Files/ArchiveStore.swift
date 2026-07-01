@@ -10,12 +10,14 @@ enum ArchiveStore {
         case badZip(String)
         case inflateFailed(name: String)
         case writeFailed(name: String, underlying: String)
+        case readFailed(name: String, underlying: String)
 
         var errorDescription: String? {
             switch self {
             case .badZip(let why): return "无效的 zip：\(why)"
             case .inflateFailed(let name): return "解压条目失败：\(name)"
             case .writeFailed(let name, let underlying): return "写入失败 \(name)：\(underlying)"
+            case .readFailed(let name, let underlying): return "读取失败 \(name)：\(underlying)"
             }
         }
     }
@@ -45,7 +47,13 @@ enum ArchiveStore {
         var central: [UInt8] = []
 
         for entry in entries {
-            let data = [UInt8]((try? Data(contentsOf: entry.url)) ?? Data())
+            // 读失败时显式抛出，避免静默把不可读文件压成空内容导致归档损坏。
+            let data: [UInt8]
+            do {
+                data = [UInt8](try Data(contentsOf: entry.url))
+            } catch {
+                throw ArchiveError.readFailed(name: entry.name, underlying: error.localizedDescription)
+            }
             let crc = crc32(data)
             let nameBytes = [UInt8](entry.name.utf8)
 

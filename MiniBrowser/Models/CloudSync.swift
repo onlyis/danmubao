@@ -17,8 +17,11 @@ final class CloudSync {
     private var flushWork: DispatchWorkItem?
     private let flushDelay: TimeInterval = 2
 
+    /// 远程变更通知的观察者 token，保存以便 deinit 时移除，避免观察者泄漏。
+    private var observer: NSObjectProtocol?
+
     private init() {
-        NotificationCenter.default.addObserver(
+        observer = NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: store, queue: .main
         ) { [weak self] note in
@@ -27,6 +30,10 @@ final class CloudSync {
             MainActor.assumeIsolated { self?.handleRemote(keys) }
         }
         store.synchronize()
+    }
+
+    deinit {
+        if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
     /// 推送本地变更到 iCloud（合并写：同 key 多次变更只保留最后一次，延迟 `flushDelay` 统一落库）。

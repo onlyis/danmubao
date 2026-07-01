@@ -123,7 +123,7 @@ struct DownloadConfirmSheet: View {
     @State private var urlText: String = ""
 
     private var fileName: String {
-        URL(string: urlText.hasPrefix("http") ? urlText : "https://" + urlText)
+        urlText.asWebURL()
             .map(DownloadManager.fileName) ?? "download.bin"
     }
 

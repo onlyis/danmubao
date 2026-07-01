@@ -39,7 +39,11 @@ enum EpubParser {
     static func unpackBase() -> URL {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("EpubUnpacked", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        } catch {
+            NSLog("[EpubParser] 创建解压目录失败 path=%@ error=%@", base.path, String(describing: error))
+        }
         return base
     }
 
@@ -54,8 +58,14 @@ enum EpubParser {
         // 已解压过（存在 META-INF）则复用，否则解压。
         let containerURL = dest.appendingPathComponent("META-INF/container.xml")
         if !fm.fileExists(atPath: containerURL.path) {
-            // 清理半成品再重解，避免脏目录。
-            try? fm.removeItem(at: dest)
+            // 清理半成品再重解，避免脏目录。目录不存在属正常情况，仅记录其它失败。
+            do {
+                try fm.removeItem(at: dest)
+            } catch let error as NSError where error.code == NSFileNoSuchFileError {
+                // 目录本就不存在，无需处理
+            } catch {
+                NSLog("[EpubParser] 清理半成品解压目录失败 path=%@ error=%@", dest.path, String(describing: error))
+            }
             do {
                 try ArchiveStore.unzip(epubURL, to: dest)
             } catch {

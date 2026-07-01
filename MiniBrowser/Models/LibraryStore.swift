@@ -33,23 +33,40 @@ final class LibraryStore: ObservableObject {
 
     init() {
         // 属性观察器不在 init 中触发，加载已存数据不会回写
-        bookmarks = DiskStore.load([Bookmark].self, from: "bookmarks.json") ?? SampleData.bookmarks
-        history = DiskStore.load([HistorySection].self, from: "history.json") ?? SampleData.history
+        bookmarks = DiskStore.load([Bookmark].self, from: PersistenceKey.bookmarks) ?? SampleData.bookmarks
+        history = DiskStore.load([HistorySection].self, from: PersistenceKey.history) ?? SampleData.history
 
         // iCloud：接收远程变更；启动时若云端已有数据则拉取（last-writer-wins 简化策略）
         CloudSync.shared.onRemoteChange = { [weak self] key, data in self?.applyRemote(key: key, data: data) }
-        if let d = CloudSync.shared.pull("bookmarks"),
-           let v = try? JSONDecoder().decode([Bookmark].self, from: d) { bookmarks = v }
-        if let d = CloudSync.shared.pull("history"),
-           let v = try? JSONDecoder().decode([HistorySection].self, from: d) { history = v }
+        if let d = CloudSync.shared.pull("bookmarks"), let v = decodeRemote([Bookmark].self, from: d, key: "bookmarks") {
+            bookmarks = v
+        }
+        if let d = CloudSync.shared.pull("history"), let v = decodeRemote([HistorySection].self, from: d, key: "history") {
+            history = v
+        }
         rebuildChildrenIndex()   // init 中赋值不触发 didSet，显式建一次索引
         history = regroup(history.flatMap(\.items))   // 按真实日期重整（旧无 day 数据归「更早」）
     }
 
+    /// 解码用户数据（书签/历史）。解码失败仅结构化记录上下文并回落默认值，绝不崩溃（保持自愈语义）。
+    private func decodeRemote<T: Decodable>(_ type: T.Type, from data: Data, key: String) -> T? {
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            // 仅记录 key 与 error，回落默认（保留现有值），不中断 UI。
+            NSLog("[LibraryStore] 解码失败（回落默认）key=%@ error=%@", key, String(describing: error))
+            return nil
+        }
+    }
+
     /// 编码一次 → 本地落盘 + 推送 iCloud（应用远程变更时不回推）
     private func persist<T: Encodable>(_ value: T, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else {
-            assertionFailure("LibraryStore 编码失败 key=\(key)")
+        let data: Data
+        do {
+            data = try JSONEncoder().encode(value)
+        } catch {
+            // Release 下 assertionFailure 是 no-op，会静默丢数据；改为结构化记录上下文。
+            NSLog("[LibraryStore] 编码失败 key=%@ error=%@", key, String(describing: error))
             return
         }
         DiskStore.write(data, to: "\(key).json")
@@ -62,9 +79,9 @@ final class LibraryStore: ObservableObject {
         defer { applyingRemote = false }
         switch key {
         case "bookmarks":
-            if let v = try? JSONDecoder().decode([Bookmark].self, from: data) { bookmarks = v }
+            if let v = decodeRemote([Bookmark].self, from: data, key: key) { bookmarks = v }
         case "history":
-            if let v = try? JSONDecoder().decode([HistorySection].self, from: data) { history = v }
+            if let v = decodeRemote([HistorySection].self, from: data, key: key) { history = v }
         default: break
         }
     }
