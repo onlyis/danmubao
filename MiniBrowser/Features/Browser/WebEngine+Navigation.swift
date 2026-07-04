@@ -8,7 +8,15 @@ extension WebEngine {
     func submit(_ text: String, searchTemplate: String) {
         load(Self.normalize(text, searchTemplate: searchTemplate))
     }
-    func load(_ url: URL) { navigating = true; webView.load(URLRequest(url: url)) }
+    func load(_ url: URL) {
+        navigating = true
+        loadError = nil                               // 新地址：清掉旧的错误页
+        chromeHidden = false; lastScrollY = 0        // 新页面复位顶部栏显隐
+        title = ""                                    // 清掉上一页标题，避免加载新页时 header 仍显示旧标题
+        displayURL = url.host ?? url.absoluteString    // 立即显示目标地址（而非旧页内容）
+        pendingLoadURL = url                          // 记录目标地址（证书失败改 www. 重试时据此重建）
+        webView.load(URLRequest(url: url))
+    }
     /// 重新套用当前所有启用的内容拦截规则（插件启停后调用），可选随即重载当前页使其立即生效。
     func refreshContentRules(reload: Bool) {
         let controller = webView.configuration.userContentController
@@ -83,9 +91,13 @@ extension WebEngine {
 extension WebEngine: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLoading = true
+        loadError = nil      // 开始新导航：清掉旧错误页
     }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         navigating = false   // 新页面首帧已就绪，撤掉加载遮罩
+        loadError = nil      // 已成功提交内容
+        wwwRetriedHost = nil // 成功提交，允许后续导航再次触发 www. 重试
+        if nightMode { injectNightCSS() }   // 尽早注入反色，避免内容绘制出来先闪白（didFinish 太晚）
         if let host = webView.url?.host, !host.isEmpty { mainDocumentHost = host }   // 记录主文档域名，供跨域跳转判断
     }
 
@@ -104,12 +116,29 @@ extension WebEngine: WKNavigationDelegate {
     }
 
     /// 缓存服务器信任对象用于证书查看；信任决策仍交回系统默认处理（不改变安全行为）。
+    /// 额外：裸域名证书对该 host 无效时（很多站点证书只签 *.domain / www，不含裸域，如 hao123.com），
+    /// 取消并自动改用 www. 重新加载——这样点「hao123.com」也能正常打开，且不降低安全性（仍走系统校验）。
     func webView(_ webView: WKWebView,
                  didReceive challenge: URLAuthenticationChallenge,
                  completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let trust = challenge.protectionSpace.serverTrust {
-            latestServerTrust = trust
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.performDefaultHandling, nil); return
+        }
+        latestServerTrust = trust
+        let host = challenge.protectionSpace.host
+        // 证书对当前 host 是否有效（策略已含 hostname 校验）
+        let valid = SecTrustEvaluateWithError(trust, nil)
+        if !valid, !host.hasPrefix("www."), host.split(separator: ".").count == 2,
+           wwwRetriedHost != host, let target = pendingLoadURL ?? webView.url,
+           var comps = URLComponents(url: target, resolvingAgainstBaseURL: false) {
+            wwwRetriedHost = host
+            comps.host = "www." + host
+            if let wwwURL = comps.url {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                load(wwwURL)   // 委托方法在主线程回调，直接重载
+                return
+            }
         }
         completionHandler(.performDefaultHandling, nil)
     }
@@ -121,9 +150,59 @@ extension WebEngine: WKNavigationDelegate {
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         isLoading = false; navigating = false
+        showLoadError(error)
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLoading = false; navigating = false
+        if retryWithWWWIfNeeded(error) { return }   // 正在改 www. 重试，先不报错
+        showLoadError(error)
+    }
+
+    /// 展示加载错误页（在内容区自己的区域显示失败，而不是停留在上一页内容）。
+    /// 跳过「取消 / 被新导航替换」以及「刚触发 www. 重试的那次失败」。
+    private func showLoadError(_ error: Error) {
+        let ns = error as NSError
+        guard ns.code != NSURLErrorCancelled else { return }
+        let failing = ns.userInfo[NSURLErrorFailingURLStringErrorKey] as? String
+        if let h = failing.flatMap({ URL(string: $0)?.host }), h == wwwRetriedHost { return }
+        loadError = LoadError(url: failing ?? pendingLoadURL?.absoluteString ?? displayURL,
+                              message: ns.localizedDescription, code: ns.code)
+    }
+
+    /// 重试上次失败的加载。
+    func retryFailedLoad() {
+        loadError = nil
+        if let u = pendingLoadURL { load(u) } else { reload() }
+    }
+
+    /// 裸域名证书/连接失败时自动改用 www. 重试一次；返回是否已发起重试。
+    /// 很多站点证书只签发给 www.（如 hao123.com 的证书不含裸域），直接打开裸域会证书不匹配而打不开。
+    @discardableResult
+    private func retryWithWWWIfNeeded(_ error: Error) -> Bool {
+        let ns = error as NSError
+        // 仅针对证书/安全连接/找不到或连不上主机这类「换 www. 可能可解」的失败。
+        let retryCodes: Set<Int> = [
+            NSURLErrorSecureConnectionFailed,           // -1200
+            NSURLErrorServerCertificateHasBadDate,      // -1201
+            NSURLErrorServerCertificateUntrusted,       // -1202
+            NSURLErrorServerCertificateHasUnknownRoot,  // -1203
+            NSURLErrorServerCertificateNotYetValid,     // -1204
+            NSURLErrorCannotFindHost,                   // -1003
+            NSURLErrorCannotConnectToHost,              // -1004
+        ]
+        guard retryCodes.contains(ns.code),
+              let failing = ns.userInfo[NSURLErrorFailingURLStringErrorKey] as? String,
+              let url = URL(string: failing), let host = url.host,
+              wwwRetriedHost != host,
+              !host.hasPrefix("www."),
+              host.split(separator: ".").count == 2,   // 仅裸的可注册域（如 hao123.com），不动子域
+              var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return false }
+        wwwRetriedHost = host
+        comps.host = "www." + host
+        guard let retryURL = comps.url else { return false }
+        load(retryURL)
+        return true
     }
 }
 
@@ -135,7 +214,18 @@ extension WebEngine: WKUIDelegate {
         // 链接：追加自定义动作；图片等其它元素：保留系统默认菜单（保存图片/拷贝等）
         let url = elementInfo.linkURL
         let config = UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] suggested in
-            guard let url else { return UIMenu(title: "", children: suggested) }
+            guard let url else {
+                // 非链接（多为图片）：在系统默认菜单（保存图片等）基础上追加「批量保存图片」。
+                let batchSave = UIAction(title: "批量保存图片",
+                                         image: UIImage(systemName: "square.and.arrow.down.on.square")) { _ in
+                    self?.onBatchSaveImages?()
+                }
+                return UIMenu(title: "", children: suggested + [batchSave])
+            }
+            let newTab = UIAction(title: "在新标签页打开",
+                                  image: UIImage(systemName: "plus.square.on.square")) { _ in
+                self?.onOpenInNewTab?(url)
+            }
             let background = UIAction(title: "在后台打开",
                                       image: UIImage(systemName: "rectangle.stack.badge.plus")) { _ in
                 self?.onOpenInBackground?(url)
@@ -144,7 +234,7 @@ extension WebEngine: WKUIDelegate {
                                     image: UIImage(systemName: "arrow.down.circle")) { _ in
                 self?.onRequestDownload?(url)
             }
-            return UIMenu(title: url.absoluteString, children: suggested + [background, download])
+            return UIMenu(title: url.absoluteString, children: suggested + [newTab, background, download])
         }
         completionHandler(config)
     }

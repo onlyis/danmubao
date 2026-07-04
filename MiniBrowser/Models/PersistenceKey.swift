@@ -41,6 +41,10 @@ enum PersistenceKey {
     static let homepageURL = "homepage_url.json"
     /// 默认视频播放倍速
     static let defaultVideoRate = "default_video_rate.json"
+    /// 搜索框位置（顶部 / 键盘上方）
+    static let searchBarAtTop = "search_bar_at_top.json"
+    /// App 语言（跟随系统 / 中文 / English）
+    static let appLanguage = "app_language.json"
     /// 标签页状态(用于恢复)
     static let tabs = "tabs.json"
 

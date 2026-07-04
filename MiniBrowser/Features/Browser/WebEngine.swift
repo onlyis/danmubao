@@ -20,6 +20,13 @@ final class WebEngine: NSObject, ObservableObject {
     @Published var isLoading = false
     /// 显式加载新地址期间为 true（遮住旧页面，避免切换时看到上一个页面）；首帧提交后清除。
     @Published var navigating = false
+    /// 页面加载失败信息（非空时在内容区展示错误页，而非停留在上一页内容）。
+    @Published var loadError: LoadError?
+    struct LoadError: Equatable { var url: String; var message: String; var code: Int }
+    /// 顶部地址栏是否随滚动隐藏（下滑隐藏、上滑或回到顶部时显示）。由 scrollView 偏移驱动。
+    @Published var chromeHidden = false
+    /// 上一次用于判定滚动方向的纵向偏移（越过阈值才更新，实现累积判向）。
+    var lastScrollY: CGFloat = 0
 
     /// 桌面版 UA（Safari on macOS）
     let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
@@ -35,6 +42,10 @@ final class WebEngine: NSObject, ObservableObject {
     @Published var blockRedirects = false
     /// 当前主文档 host：用于判断后续自动跳转是否跨域。didCommit 时更新。
     var mainDocumentHost = ""
+    /// 已用 www. 重试过的 host（避免裸域名证书/连接失败时无限重试）；成功提交后清空。
+    var wwwRetriedHost: String?
+    /// 最近一次 load 的目标 URL（证书失败改用 www. 重试时据此重建带 www 的地址）。
+    var pendingLoadURL: URL?
     /// 拦截到跳转时回调（携带被拦截的目标 URL），由视图层接到 Toast 提示。
     var onBlockedRedirect: ((URL) -> Void)?
     /// 最近一次 TLS 握手缓存的服务器信任对象（用于解析站点证书）。
@@ -45,6 +56,10 @@ final class WebEngine: NSObject, ObservableObject {
     var onRequestDownload: ((URL) -> Void)?
     /// 长按链接「在后台打开」回调。
     var onOpenInBackground: ((URL) -> Void)?
+    /// 长按链接「在新标签页打开」回调（前台新建并切换过去）。
+    var onOpenInNewTab: ((URL) -> Void)?
+    /// 长按图片「批量保存图片」回调（进入看图模式多选态一键下载）。
+    var onBatchSaveImages: (() -> Void)?
     /// 页面加载完成回调（用于回填历史标题等）。
     var onDidFinish: (() -> Void)?
 
@@ -68,6 +83,7 @@ final class WebEngine: NSObject, ObservableObject {
     init(incognito: Bool = false) {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        config.allowsPictureInPictureMediaPlayback = true   // 悬浮播放：视频整体画中画浮出
         config.defaultWebpagePreferences.allowsContentJavaScript = true
         if incognito { config.websiteDataStore = Self.incognitoDataStore }   // cookie 与普通模式隔离
         // 注入用户脚本 + 插件（必须在创建 webView 前写入 userContentController）

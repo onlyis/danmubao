@@ -30,6 +30,8 @@ struct MediaHit: Codable, Identifiable, Hashable {
     let url: String
     let kind: Kind
     let title: String
+    /// 容器/格式标签（从地址扩展名推断：MP4 / HLS / FLV / MP3…），用于列表区分不同类型。
+    let format: String
 
     /// 以媒体地址作为去重主键构造（同地址 id 相同）。
     init(url: String, kind: Kind, title: String) {
@@ -37,5 +39,26 @@ struct MediaHit: Codable, Identifiable, Hashable {
         self.url = url
         self.kind = kind
         self.title = title
+        self.format = Self.inferFormat(from: url, kind: kind)
+    }
+
+    /// 从地址扩展名推断格式标签；无法识别时回退到音/视频类型名。
+    static func inferFormat(from url: String, kind: Kind) -> String {
+        let path = url.split(separator: "?").first.map(String.init) ?? url
+        let ext = (path as NSString).pathExtension.lowercased()
+        switch ext {
+        case "m3u8":         return "HLS"
+        case "mp4", "m4v":   return "MP4"
+        case "m4s":          return "M4S"
+        case "flv":          return "FLV"
+        case "webm":         return "WEBM"
+        case "mkv":          return "MKV"
+        case "mov":          return "MOV"
+        case "ts":           return "TS"
+        case "mp3":          return "MP3"
+        case "m4a":          return "M4A"
+        case "aac":          return "AAC"
+        default:             return kind.label
+        }
     }
 }

@@ -103,6 +103,9 @@ extension BrowserViewModel {
         // 路由页面
         case "设置": route = .settings
         case "书签": route = .bookmarks
+        case "加入书签", "添加书签", "收藏页面":
+            guard isBrowsing else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return false }
+            addBookmark(title: currentTitle, url: currentURL); return true
         case "历史": route = .history
         case "下载": route = .downloads
         case "文件": route = .files
@@ -117,6 +120,7 @@ extension BrowserViewModel {
         case "搜索引擎": route = .searchEngine
         case "电子书": route = .reader
         case "看图模式", "查看图片": openImageMode()
+        case "批量保存图": openImageMode(autoSelect: true)   // 直达 grid 选图 → 一键下载
         // 页面操作（真实）
         case "刷新": guardEngine { $0.reload() }
         case "后退": back()
@@ -134,7 +138,9 @@ extension BrowserViewModel {
         case "滚动到顶": guardEngine { $0.webView.evaluateJavaScript("window.scrollTo({top:0,behavior:'smooth'})") }
         case "滚动到底": guardEngine { $0.webView.evaluateJavaScript("window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})") }
         case "下载资源", "下载当前资源": showDownloadConfirm = true
-        case "视频悬浮", "画中画": return openVideoFloat()
+        case "画中画": requestVideoPiP()                        // 视频整体悬浮（原生 PiP）
+        case "视频悬浮", "倍速播放": return openVideoFloat()     // 悬浮控制面板（含倍速菜单，最高 7×）
+        case "检测播放异常": checkVideoAnomaly(manual: true)
         case "标记广告": showMarkAds = true
         case "网站设置": showWebsiteSettings = true
         case "视频截图": captureVideoFrame()
@@ -196,7 +202,22 @@ extension BrowserViewModel {
     }
 
     // MARK: - 视频悬浮（先真实检测页面是否有视频）
-    /// 打开悬浮播放器前先检测页面视频；无视频则提示，不弹空壳播放器。
+    /// 悬浮播放（视频整体画中画浮出，而非仅悬浮控制面板）：先检测视频，命中则请求原生 PiP。
+    func requestVideoPiP() {
+        guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return }
+        engine.detectVideo { [weak self] found in
+            guard let self else { return }
+            self.hasVideo = found
+            if found {
+                engine.videoRequestPiP()
+                self.showToast("已开启悬浮播放", symbol: "pip.enter")
+            } else {
+                self.showToast("未检测到视频", symbol: "play.slash")
+            }
+        }
+    }
+
+    /// 打开悬浮控制面板前先检测页面视频；无视频则提示，不弹空壳播放器。
     @discardableResult
     func openVideoFloat() -> Bool {
         guard isBrowsing, let engine else { showToast("请先打开网页", symbol: "exclamationmark.circle"); return false }
@@ -207,6 +228,54 @@ extension BrowserViewModel {
             else { self.showToast("未检测到视频", symbol: "play.slash") }
         }
         return true
+    }
+
+    // MARK: - 视频播放异常检测
+    /// 检测当前页视频是否播放异常（MediaError / 无可用源）；命中则弹「播放异常」提示。
+    /// 由加载完成回调延时调用（见 bindActiveEngine），也可从菜单手动触发。
+    func checkVideoAnomaly(manual: Bool = false) {
+        guard isBrowsing, let engine, let tab = currentTab, tab.hasEngine else {
+            if manual { showToast("请先打开网页", symbol: "exclamationmark.circle") }
+            return
+        }
+        engine.checkVideoAnomaly { [weak self] anomaly in
+            guard let self else { return }
+            guard let a = anomaly else {
+                if manual { self.showToast("未检测到播放异常", symbol: "checkmark.circle") }
+                return
+            }
+            let text = a.message.isEmpty ? Self.videoErrorText(a.code) : a.message
+            self.videoAnomaly = VideoAnomalyAlert(text: text)
+        }
+    }
+
+    /// MediaError 码 → 中文说明（1 中止 / 2 网络 / 3 解码 / 4 源不支持）。
+    static func videoErrorText(_ code: Int) -> String {
+        switch code {
+        case 1:  return "视频播放被中止"
+        case 2:  return "网络错误导致视频加载失败"
+        case 3:  return "视频解码失败，可能格式不受支持"
+        case 4:  return "视频格式不支持或源不可用"
+        default: return "视频播放异常"
+        }
+    }
+
+    /// 「播放异常」提示里的重试：重新加载页面首个 <video>。
+    func retryVideo() {
+        videoAnomaly = nil
+        engine?.videoReload()
+    }
+
+    /// 启动视频自动检测（幂等）：浏览网页时每 2.5s 重检测一次，视频出现即自动亮出「悬浮播放」入口。
+    /// 计时器常驻但只在浏览态且有引擎时做检测（主页/无引擎为空操作），生命周期简单、无需处处启停。
+    func startVideoAutoDetect() {
+        guard videoDetectTimer == nil else { return }
+        videoDetectTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.isBrowsing, let tab = self.currentTab, tab.hasEngine else { return }
+                self.refreshVideoPresence(for: tab)
+            }
+        }
     }
 
     /// 刷新「当前标签是否有视频」（切标签/加载完成时调用），驱动悬浮入口的显隐。
@@ -460,8 +529,10 @@ extension BrowserViewModel {
     }
 
     // MARK: - 看图模式
-    /// 进入看图模式：从当前页面提取真实图片，再打开网格
-    func openImageMode() {
+    /// 进入看图模式：从当前页面提取真实图片，再打开网格。
+    /// `autoSelect` = true 时直接进入多选态（「批量保存图」用：弹 grid 选图 → 一键下载）。
+    func openImageMode(autoSelect: Bool = false) {
+        imageModeAutoSelect = autoSelect
         guard isBrowsing, let engine else {
             pageImages = []
             route = .imageViewer

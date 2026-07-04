@@ -10,6 +10,13 @@ struct HomeSettingsView: View {
             } footer: {
                 Text("关闭后，主页只保留常用宫格那一屏，不再左右滑出网址导航目录。")
             }
+            Section {
+                Toggle("搜索框固定在顶部", isOn: $vm.searchBarAtTop)
+            } header: {
+                Text("搜索框位置")
+            } footer: {
+                Text("关闭（默认）时，点击搜索后输入框显示在键盘上方——就在自定义搜索图标条的上面；开启则固定在页面顶部。")
+            }
         }
         .navigationTitle("主页设置").navigationBarTitleDisplayMode(.inline)
     }
@@ -39,7 +46,7 @@ struct TabSettingsView: View {
 /// 视频播放设置：默认倍速（真实生效，页面有视频且加载完成后自动套用）。
 struct VideoSettingsView: View {
     @EnvironmentObject var vm: BrowserViewModel
-    private let rates: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+    private let rates: [Double] = BrowserViewModel.videoRates   // 与悬浮播放器倍速档一致（最高 7×）
     var body: some View {
         Form {
             Section {

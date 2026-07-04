@@ -44,8 +44,7 @@ struct BookmarkFolderView: View {
                                 onEdit: { editing = bm }, onMove: { moving = bm })
                 } else {
                     Button {
-                        vm.open(url: bm.url, title: bm.title)
-                        vm.route = nil
+                        vm.open(url: bm.url, title: bm.title)   // open() 内已收起全屏路由
                     } label: {
                         BookmarkRowLabel(bookmark: bm, subtitle: bm.url)
                     }

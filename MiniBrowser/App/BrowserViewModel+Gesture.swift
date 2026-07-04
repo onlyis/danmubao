@@ -48,6 +48,7 @@ extension BrowserViewModel {
         case .home: goHome()
         case .tabs: showTabs = true
         case .menu: showMenu = true
+        case .search: showSearch = true
         case .bookmarks: route = .bookmarks
         case .history: route = .history
         case .downloads: route = .downloads
@@ -67,6 +68,15 @@ extension BrowserViewModel {
             engine?.webView.evaluateJavaScript("window.scrollTo({top:0,behavior:'smooth'})")
         case .scrollBottom:
             engine?.webView.evaluateJavaScript("window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})")
+        case .screenshot:
+            if gesture.haptics { Haptics.soft() }
+            saveFullScreenshot(); return   // 自带保存提示
+        case .nextTab:
+            if gesture.haptics { Haptics.soft() }
+            switchTab(by: 1); return        // switchTab 自带标签提示
+        case .prevTab:
+            if gesture.haptics { Haptics.soft() }
+            switchTab(by: -1); return
         }
         if gesture.haptics { Haptics.soft() }
         showToast(action.title, symbol: action.symbol)

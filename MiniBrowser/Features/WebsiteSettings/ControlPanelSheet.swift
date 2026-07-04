@@ -83,6 +83,7 @@ enum ControlPanelCatalog {
         .init(title: "刷新", symbol: "arrow.clockwise"),
         .init(title: "后退", symbol: "chevron.left"),
         .init(title: "前进", symbol: "chevron.right"),
+        .init(title: "加入书签", symbol: "bookmark"),
         .init(title: "复制网址", symbol: "doc.on.doc"),
         .init(title: "分享", symbol: "square.and.arrow.up"),
         .init(title: "页面查找", symbol: "doc.text.magnifyingglass"),
@@ -105,7 +106,7 @@ enum ControlPanelCatalog {
     ]
     /// 默认展示的快捷功能（首次 / 未自定义时）。
     static let defaultTitles: [String] = [
-        "刷新", "复制网址", "分享", "页面查找", "看图模式", "网页翻译",
+        "刷新", "加入书签", "复制网址", "分享", "页面查找", "看图模式", "网页翻译",
         "保存PDF", "查看源码", "滚动到顶", "滚动到底",
         "夜间模式", "电脑版", "无图模式", "广告拦截",
     ]

@@ -24,7 +24,7 @@ struct BrandIcon: View {
             case key.contains("bilibili"):   glyphTile(grad(0x29B7E6, 0x00A1D6), symbol: "tv.fill")
             case key.contains("sm.cn"):      letterTile(grad2(0xFF9020, 0xFF7400), fg: .white, text: "神")
             case link.symbol != nil:         glyphTile(grad2Color(link.color), symbol: link.symbol!)
-            default:                          letterTile(grad2Color(link.color), fg: .white, text: link.glyph)
+            default:                          faviconTile   // 未识别品牌：拉真实站点图标，失败回退首字色块
             }
         }
         .frame(width: size, height: size)
@@ -40,6 +40,34 @@ struct BrandIcon: View {
                     .strokeBorder(Color.black.opacity(bordered ? 0.06 : 0.03),
                                   lineWidth: Theme.Size.hairline)
             )
+    }
+
+    /// 未识别品牌站点：在色块底上叠加真实站点 favicon（成功显示图标，加载中/失败回退首字）。
+    /// 用站点自身 `/favicon.ico`（不经第三方，尊重隐私），覆盖多数常见站点。
+    private var faviconTile: some View {
+        tileBackground(grad2Color(link.color))
+            .overlay {
+                AsyncImage(url: faviconURL) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().aspectRatio(contentMode: .fit).padding(size * 0.2)
+                    default:
+                        Text(link.glyph.isEmpty ? String(link.title.prefix(1)).uppercased() : link.glyph)
+                            .font(.system(size: size * 0.46, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .minimumScaleFactor(0.5).lineLimit(1).padding(.horizontal, 4)
+                    }
+                }
+            }
+    }
+
+    /// 站点 favicon 地址：从 link.url 解析裸 host 后取 `https://host/favicon.ico`。
+    private var faviconURL: URL? {
+        var s = link.url.lowercased()
+        if let r = s.range(of: "://") { s = String(s[r.upperBound...]) }
+        s = s.split(separator: "/").first.map(String.init) ?? s
+        guard !s.isEmpty else { return nil }
+        return URL(string: "https://\(s)/favicon.ico")
     }
 
     private func glyphTile(_ fill: some ShapeStyle, symbol: String) -> some View {

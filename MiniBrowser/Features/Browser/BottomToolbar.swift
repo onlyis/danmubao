@@ -83,10 +83,11 @@ struct BottomToolbar: View {
         }
         .frame(height: Theme.Size.toolbarHeight)
         .frame(maxWidth: .infinity)
+        // 底部工具栏不随无痕变黑（无痕的深色标识只放在顶部地址栏）
         .background(
-            (vm.isIncognito ? Color(hex: 0x111114) : Theme.Colors.card)
+            Theme.Colors.card
                 .overlay(alignment: .top) { Hairline() }
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea(edges: [.bottom, .horizontal])   // 横屏时背景也铺满左右
         )
     }
 

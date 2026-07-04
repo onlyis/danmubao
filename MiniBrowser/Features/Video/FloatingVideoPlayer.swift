@@ -23,8 +23,17 @@ struct FloatingVideoPlayer: View {
                 Image(systemName: "play.rectangle.fill").foregroundStyle(.white.opacity(0.9))
                 Text(timeText).font(.system(size: 12, weight: .medium)).foregroundStyle(.white).lineLimit(1)
                 Spacer()
-                Button { cycleRate() } label: {
-                    Text(String(format: "%.2g×", rate))
+                Menu {
+                    ForEach(BrowserViewModel.videoRates, id: \.self) { r in
+                        Button {
+                            engine?.videoSetRate(r); refresh()
+                        } label: {
+                            if abs(rate - r) < 0.01 { Label(rateLabel(r), systemImage: "checkmark") }
+                            else { Text(rateLabel(r)) }
+                        }
+                    }
+                } label: {
+                    Text(rateLabel(rate))
                         .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
@@ -95,9 +104,9 @@ struct FloatingVideoPlayer: View {
             if st == nil { vm.showVideoFloat = false }
         }
     }
-    private func cycleRate() {
-        let next = rate >= 2 ? 0.5 : (rate + 0.5)
-        engine?.videoSetRate(next); refresh()
+    /// 倍速档位显示：整数省略小数（如 7×、2×），其余保留一位（如 1.25×）。
+    private func rateLabel(_ r: Double) -> String {
+        r == r.rounded() ? String(format: "%d×", Int(r)) : String(format: "%g×", r)
     }
 
     private func snapToEdge() {

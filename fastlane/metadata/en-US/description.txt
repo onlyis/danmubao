@@ -1,0 +1,13 @@
+Turn your phone into a glowing LED banner.
+
+Danmu Bao turns your phone into a handheld scrolling LED display — for concerts, airport pickups, birthdays, confessions and cheering. Type any text and play it full-screen as a bright marquee that's easy to read from across the room.
+
+FEATURES
+- 100+ text animations: blink, breathe, rainbow, neon, beat and more
+- Full customization: font, color, glow, size, scroll speed, direction, background
+- Template library: ready-made phrases for concerts, pickups, birthdays and more
+- My Banners: save your favorites and reuse them anytime
+- Hold up and play: one tap for full-screen playback with auto screen-on and max brightness
+- Fully on-device: no sign-up, works offline, collects no personal data
+
+Whether you're at a live show or surprising a friend, Danmu Bao makes your message shine.

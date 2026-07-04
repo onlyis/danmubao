@@ -37,8 +37,23 @@ final class BrowserViewModel: ObservableObject {
         var scheme: ColorScheme? { self == .light ? .light : (self == .dark ? .dark : nil) }
     }
 
-    /// App 自身配色：只由外观模式决定。网页夜间模式不再强制整个 App 变深色（那会劫持主页/设置/菜单）。
-    var resolvedScheme: ColorScheme? { appearanceMode.scheme }
+    /// App 语言：跟随系统（按用户设备语言）/ 简体中文 / English。持久化。
+    @Published var appLanguage: AppLanguage = .system { didSet { DiskStore.save(appLanguage, to: PersistenceKey.appLanguage) } }
+    enum AppLanguage: String, CaseIterable, Identifiable, Codable {
+        case system = "跟随系统", zh = "简体中文", en = "English"
+        var id: String { rawValue }
+        /// 生效的 Locale：system 用当前设备语言；否则强制指定。SwiftUI 的 Text/Label 按此本地化。
+        var resolvedLocale: Locale {
+            switch self {
+            case .system: return Locale.autoupdatingCurrent
+            case .zh:     return Locale(identifier: "zh-Hans")
+            case .en:     return Locale(identifier: "en")
+            }
+        }
+    }
+
+    /// App 自身配色：夜间模式时整个 App 一并变深色（用户要「app 也要夜间」）；否则由外观模式决定。
+    var resolvedScheme: ColorScheme? { isNightMode ? .dark : appearanceMode.scheme }
     /// 当前默认搜索引擎（持久化）。`searchTemplate` 由它派生，供 WebEngine.normalize 使用。
     @Published var searchEngine: SearchEngine = SearchEngine.builtIn[0] {
         didSet { DiskStore.save(searchEngine, to: PersistenceKey.searchEngine) }
@@ -58,6 +73,8 @@ final class BrowserViewModel: ObservableObject {
     /// 当前页面地址 / 标题（用于网站设置、二维码等只读展示）
     var currentURL: String { currentTab?.displayURL ?? "" }
     var currentTitle: String { currentTab?.displayTitle ?? "" }
+    /// 当前页完整地址（含协议与路径，供点击搜索时预填编辑）；无则回退到 host。
+    var currentFullURL: String { engine?.webView.url?.absoluteString ?? currentURL }
 
     // MARK: - 路由（全屏页面）
     enum Route: Identifiable {
@@ -160,6 +177,8 @@ final class BrowserViewModel: ObservableObject {
 
     /// 看图模式：当前页面提取出的图片地址
     @Published var pageImages: [String] = []
+    /// 进入看图模式后是否自动进入多选态（供「批量保存图」直达 grid 选图→一键下载）。
+    @Published var imageModeAutoSelect = false
 
     /// 网址导航分类的展开状态（默认全展开，记住用户操作并持久化）
     @Published var navExpanded: Set<String> = Set(NavCatalog.categories.map(\.title)) {
@@ -192,6 +211,8 @@ final class BrowserViewModel: ObservableObject {
         if let nth = DiskStore.load(Bool.self, from: PersistenceKey.newTabOpensHomepage) { newTabOpensHomepage = nth }
         if let hu = DiskStore.load(String.self, from: PersistenceKey.homepageURL) { homepageURL = hu }
         if let dvr = DiskStore.load(Double.self, from: PersistenceKey.defaultVideoRate) { defaultVideoRate = dvr }
+        if let sbt = DiskStore.load(Bool.self, from: PersistenceKey.searchBarAtTop) { searchBarAtTop = sbt }
+        if let al = DiskStore.load(AppLanguage.self, from: PersistenceKey.appLanguage) { appLanguage = al }
         // 不变式校正：gesture ∈ toolbarItems ⟺ 放置方式为工具栏（防旧数据不一致导致空槽）
         let gestureInToolbar = toolbarItems.contains(.gesture)
         if (gesture.placement == .toolbar) != gestureInToolbar {
@@ -256,6 +277,9 @@ final class BrowserViewModel: ObservableObject {
     @Published var autoRefreshSeconds: Int = 0
     /// 自动刷新计时器(主线程 Timer)。开档时创建, 关档/换档时失效。
     var autoRefreshTimer: Timer?
+    /// 视频自动检测计时器：浏览网页时周期性重检测页面是否有可播放视频，
+    /// 让「悬浮播放」入口在视频出现/开始播放时自动显现（含 SPA 后加载的视频）。
+    var videoDetectTimer: Timer?
     /// 可循环的档位序列。
     static let autoRefreshSteps: [Int] = [0, 15, 30, 60]
 
@@ -284,6 +308,10 @@ final class BrowserViewModel: ObservableObject {
     @Published var homepageURL: String = "baidu.com" { didSet { DiskStore.save(homepageURL, to: PersistenceKey.homepageURL) } }
     /// 默认视频播放倍速（偏好，持久化，默认 1.0 倍速）。
     @Published var defaultVideoRate: Double = 1.0 { didSet { DiskStore.save(defaultVideoRate, to: PersistenceKey.defaultVideoRate) } }
+    /// 搜索框位置：false = 默认在键盘上方（自定义搜索图标条的上面）；true = 固定在顶部。持久化。
+    @Published var searchBarAtTop: Bool = false { didSet { DiskStore.save(searchBarAtTop, to: PersistenceKey.searchBarAtTop) } }
+    /// 倍速档位（悬浮播放器倍速菜单与「倍速播放」共用），最高 7×。
+    static let videoRates: [Double] = [0.5, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0, 7.0]
 
     /// 拦截跨域自动跳转（页面级开关，按引擎生效，切标签时由 bindActiveEngine 同步）。持久化。
     @Published var blockRedirects: Bool = false { didSet { DiskStore.save(blockRedirects, to: PersistenceKey.blockRedirects) } }
@@ -301,6 +329,10 @@ final class BrowserViewModel: ObservableObject {
     @Published var mediaHits: [MediaHit] = []
     /// 媒体嗅探结果页呈现标志（RootView 以 .sheet 呈现 MediaSnifferView）。
     @Published var showMediaSniffer = false
+
+    // MARK: - 视频播放异常（加载完成后自检；命中则弹「播放异常」提示，支持重试/嗅探下载）
+    struct VideoAnomalyAlert: Identifiable { let id = UUID(); let text: String }
+    @Published var videoAnomaly: VideoAnomalyAlert?
 
     // MARK: - 标签查询（O(1)）
     var activeTabs: [Tab] { isIncognito ? incognitoTabs : tabs }
@@ -324,7 +356,7 @@ enum SampleData {
         .init(title: "优酷", url: "youku.com", glyph: "优", colorHex: 0x1AA1E1),
         .init(title: "腾讯视频", url: "v.qq.com", glyph: "腾", colorHex: 0xFF9B00),
         .init(title: "微博", url: "weibo.com", glyph: "微", colorHex: 0xE6162D),
-        .init(title: "网址导航", url: "hao123.com", glyph: "", colorHex: 0x0A84FF, symbol: "safari.fill"),
+        .init(title: "网址导航", url: "www.hao123.com", glyph: "", colorHex: 0x0A84FF, symbol: "safari.fill"),
         .init(title: "知乎", url: "zhihu.com", glyph: "知", colorHex: 0x0066FF),
         .init(title: "B站", url: "bilibili.com", glyph: "B", colorHex: 0xFB7299),
     ]

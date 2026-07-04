@@ -23,16 +23,19 @@ struct GestureButton: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // 轨迹与提示（不拦截触摸）
+                // 轨迹与提示（不拦截触摸）。未画出任何方向前不显示提示框（去掉「滑动绘制手势」占位）。
                 if phase == .gesturing {
                     trail
-                    hud(in: geo.size)
+                    if !recognized.isEmpty { hud(in: geo.size) }
                 }
                 // 单一稳定容器承载手势：线/按钮只切透明度（不切换视图），
                 // 这样从边缘起手时手势不会被视图替换打断，边缘也能正常画手势。
+                // 手势必须绑在 .position 之前的 handle 上：否则 .position 会把视图撑满整屏，
+                // 手势命中区随之扩散到全屏，吃掉按钮之外内容（主页宫格/网页列表）的点击。
+                // 绑在 handle 上后命中区仅限按钮本身；一旦起手，拖动仍可划出按钮范围正常绘制。
                 handle
-                    .position(handlePosition(in: geo.size))
                     .gesture(drag(in: geo.size))
+                    .position(handlePosition(in: geo.size))
             }
             .coordinateSpace(name: coordSpace)
         }
@@ -137,7 +140,7 @@ struct GestureButton: View {
     // 顶部提示：识别到的方向 + 命中功能
     private func hud(in size: CGSize) -> some View {
         VStack(spacing: 6) {
-            Text(recognized.isEmpty ? "滑动绘制手势…" : recognized.glyphs)
+            Text(recognized.glyphs)
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(.white)
             if let matched {

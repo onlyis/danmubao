@@ -1,0 +1,111 @@
+/* MiniBrowser — English localization (keys = Simplified Chinese source strings). */
+
+/* Common */
+"完成" = "Done";
+"取消" = "Cancel";
+"添加" = "Add";
+"删除" = "Delete";
+"重试" = "Retry";
+"编辑" = "Edit";
+"保存" = "Save";
+"分享" = "Share";
+"清除" = "Clear";
+"打开" = "Open";
+"确定" = "OK";
+"忽略" = "Ignore";
+
+/* Home */
+"搜索或输入网址" = "Search or enter address";
+"添加快捷网站" = "Add shortcut";
+"名称" = "Name";
+"名称（可选）" = "Name (optional)";
+"网址" = "Website";
+"在新标签页打开" = "Open in new tab";
+"更换图标" = "Change icon";
+
+/* Search */
+"历史记录" = "History";
+"相关历史" = "Related history";
+"搜索建议" = "Suggestions";
+"打开剪贴板中的网址" = "Open URL from clipboard";
+"搜索历史" = "Search history";
+
+/* Error page */
+"无法打开网页" = "Can't open page";
+
+/* Tabs */
+"普通浏览" = "Normal";
+"无痕浏览" = "Private";
+"新标签页" = "New Tab";
+"无痕模式" = "Private Mode";
+"关闭所有无痕标签后将清除本次记录" = "Closing all private tabs clears this session";
+
+/* Downloads / Files */
+"暂无下载" = "No downloads";
+"在网页中长按链接或资源即可下载" = "Long‑press a link or resource on a page to download";
+"下载" = "Downloads";
+"文件" = "Files";
+
+/* Menu / status */
+"当前为无痕模式" = "Private mode";
+"当前为夜间模式" = "Night mode";
+"已开启广告拦截" = "Ad blocking on";
+"当前为普通模式" = "Normal mode";
+"加入书签" = "Add bookmark";
+"书签" = "Bookmarks";
+"历史" = "History";
+"设置" = "Settings";
+
+/* Settings — Appearance / Language */
+"主题" = "Theme";
+"语言" = "Language";
+"外观" = "Appearance";
+"外观模式" = "Appearance";
+"OLED 纯黑" = "OLED true black";
+"深色模式下使用纯黑背景，在 OLED 屏幕上更省电、对比更强。" = "Use pure black in dark mode for better battery and contrast on OLED screens.";
+"沉浸式壁纸" = "Wallpaper";
+"沉浸式壁纸" = "Immersive wallpaper";
+
+/* Settings — Home */
+"主页设置" = "Home";
+"显示网址导航第二屏" = "Show navigation directory (2nd screen)";
+"关闭后，主页只保留常用宫格那一屏，不再左右滑出网址导航目录。" = "When off, the home page keeps only the shortcuts screen.";
+"搜索框位置" = "Search bar position";
+"搜索框固定在顶部" = "Pin search bar to top";
+"关闭（默认）时，点击搜索后输入框显示在键盘上方——就在自定义搜索图标条的上面；开启则固定在页面顶部。" = "When off (default), the input shows above the keyboard, right above the engine bar; when on, it stays at the top.";
+
+/* Settings — Tabs */
+"标签页" = "Tabs";
+"新标签页直接打开主页" = "Open homepage in new tab";
+"开启后，点「+」新建标签会直接加载下面的主页地址，而不是空白新标签页。" = "When on, tapping “+” loads the homepage below instead of a blank tab.";
+"主页地址" = "Homepage URL";
+
+/* Settings — Video */
+"视频播放" = "Video";
+"默认播放倍速" = "Default speed";
+"网页加载完成后，若检测到视频则自动应用该倍速。部分站点可能在播放时覆盖此设置。" = "Applied automatically when a video is detected after load. Some sites may override it.";
+
+/* Gestures */
+"手势按钮" = "Gesture button";
+"启用手势按钮" = "Enable gesture button";
+"手势控制" = "Gesture control";
+"手势规则" = "Gesture rules";
+"添加手势" = "Add gesture";
+"恢复默认手势" = "Restore defaults";
+"直线容差" = "Line tolerance";
+"按钮大小" = "Button size";
+"触觉反馈" = "Haptics";
+"绘制手势" = "Draw gesture";
+"手动微调" = "Fine‑tune";
+"触发功能" = "Action";
+"编辑手势" = "Edit gesture";
+"清除" = "Clear";
+
+/* Video anomaly alert */
+"播放异常" = "Playback error";
+"嗅探下载" = "Sniff & download";
+
+/* Media sniffer */
+"媒体嗅探" = "Media sniffer";
+"未嗅探到媒体" = "No media found";
+"复制链接" = "Copy link";

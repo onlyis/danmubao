@@ -33,6 +33,10 @@ struct ImageGridView: View {
             }
         }
         .background(Theme.Colors.background.ignoresSafeArea())
+        // 「批量保存图」直达时自动进入多选态（弹 grid 选图 → 一键下载）
+        .onAppear {
+            if vm.imageModeAutoSelect { selecting = true; vm.imageModeAutoSelect = false }
+        }
         .navigationTitle("网页图片 (\(count))").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { Button(selecting ? "取消" : "完成") { selecting ? (selecting = false) : dismiss() } }

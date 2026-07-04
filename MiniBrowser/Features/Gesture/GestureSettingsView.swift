@@ -148,14 +148,17 @@ struct GestureRuleEditView: View {
                 }
 
                 Section("手动微调") {
+                    // 仅列 8 个线性方向；圆形手势(↻↺)由绘制识别，不作为手动追加项，避免「点一下冒出很多方向」。
                     LazyVGrid(columns: Array(repeating: GridItem(), count: 4), spacing: 10) {
-                        ForEach(GestureDirection.allCases, id: \.self) { dir in
+                        ForEach(GestureDirection.linearCases, id: \.self) { dir in
                             Button { rule.directions.append(dir) } label: {
                                 Text(dir.glyph).font(.system(size: 20, weight: .bold))
                                     .frame(maxWidth: .infinity).frame(height: 40)
                                     .background(Theme.Colors.groupedBackground, in: RoundedRectangle(cornerRadius: 8))
                                     .foregroundStyle(Theme.Colors.primaryText)
                             }
+                            // borderless：让宫格里每个方向按钮各自独立响应，避免 Form 行把一次点击派发给多个按钮
+                            .buttonStyle(.borderless)
                         }
                     }
                     .padding(.vertical, 4)

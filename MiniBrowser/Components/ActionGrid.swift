@@ -100,10 +100,10 @@ struct ActionCell: View {
         Button { Haptics.light(); onTap() } label: {
             VStack(spacing: 7) {
                 Image(systemName: item.symbol)
-                    .font(.system(size: 22))
+                    .font(.system(size: 25))
                     .foregroundStyle(isOn ? .white : Theme.Colors.primaryText)
-                    .frame(width: 50, height: 50)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .frame(width: 58, height: 58)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(isOn ? Theme.Colors.accent : Theme.Colors.groupedBackground))
                     .overlay(alignment: .bottomTrailing) {
                         if item.isToggle && !editing {
@@ -144,10 +144,10 @@ private struct AddCell: View {
     var body: some View {
         Button(action: { Haptics.light(); action() }) {
             VStack(spacing: 7) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(Theme.Colors.separator, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4]))
-                    .frame(width: 50, height: 50)
-                    .overlay(Image(systemName: "plus").font(.system(size: 22, weight: .light))
+                    .frame(width: 58, height: 58)
+                    .overlay(Image(systemName: "plus").font(.system(size: 25, weight: .light))
                         .foregroundStyle(Theme.Colors.tertiaryText))
                 Text("添加").font(.system(size: 11)).foregroundStyle(Theme.Colors.tertiaryText)
             }
@@ -173,10 +173,10 @@ private struct AddActionSheet: View {
                         } label: {
                             VStack(spacing: 7) {
                                 Image(systemName: item.symbol)
-                                    .font(.system(size: 22))
+                                    .font(.system(size: 25))
                                     .foregroundStyle(Theme.Colors.primaryText)
-                                    .frame(width: 50, height: 50)
-                                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .frame(width: 58, height: 58)
+                                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
                                         .fill(Theme.Colors.groupedBackground))
                                 Text(item.title).font(.system(size: 11))
                                     .foregroundStyle(Theme.Colors.secondaryText).lineLimit(1)

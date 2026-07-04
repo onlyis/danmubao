@@ -1,0 +1,11 @@
+# fastlane snapshot 配置 —— 各语言/设备自动截图
+
+devices(["iPhone 17 Pro Max"])          # 大尺寸截图设备，避免生成 6.1″ 以下截图
+languages(["en-US", "zh-Hans"])          # 中英各一套；与 i18n 的设备语言探测对齐
+
+scheme("Danmubao")
+
+output_directory("./screenshots")        # 生成到 fastlane/screenshots/
+clear_previous_screenshots(true)
+override_status_bar(true)                 # 干净状态栏（满电/满信号/统一时间）
+concurrent_simulators(false)

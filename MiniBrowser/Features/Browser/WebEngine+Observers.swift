@@ -21,6 +21,32 @@ extension WebEngine {
             bind(\.canGoBack) { [weak self] wv in self?.canGoBack = wv.canGoBack },
             bind(\.canGoForward) { [weak self] wv in self?.canGoForward = wv.canGoForward },
         ]
+        // 顶部栏随滚动显隐：监听 webView 内部 scrollView 偏移，按方向切换 chromeHidden。
+        observations.append(
+            webView.scrollView.observe(\.contentOffset, options: [.new]) { [weak self] sv, _ in
+                guard let self else { return }
+                let y = sv.contentOffset.y
+                if Thread.isMainThread { MainActor.assumeIsolated { self.updateChrome(offsetY: y) } }
+                else { Task { @MainActor in self.updateChrome(offsetY: y) } }
+            }
+        )
+    }
+
+    /// 依据滚动方向切换顶部栏显隐：顶部附近始终显示；明显下滑隐藏、明显上滑显示（阈值防抖）。
+    private func updateChrome(offsetY y: CGFloat) {
+        if y <= 4 {                       // 顶部附近：始终显示
+            lastScrollY = y
+            if chromeHidden { withAnimation(.easeInOut(duration: 0.22)) { chromeHidden = false } }
+            return
+        }
+        let dy = y - lastScrollY
+        if dy > 10 {                      // 明显下滑：隐藏
+            lastScrollY = y
+            if !chromeHidden { withAnimation(.easeInOut(duration: 0.22)) { chromeHidden = true } }
+        } else if dy < -10 {              // 明显上滑：显示
+            lastScrollY = y
+            if chromeHidden { withAnimation(.easeInOut(duration: 0.22)) { chromeHidden = false } }
+        }
     }
 
     // MARK: - 站点证书：解析最近缓存的 SecTrust（仅用 iOS 可用 API）

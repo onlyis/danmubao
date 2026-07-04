@@ -5,6 +5,13 @@ struct AppearanceSettingsView: View {
     @EnvironmentObject var vm: BrowserViewModel
     var body: some View {
         List {
+            Section("语言") {
+                Picker("语言", selection: $vm.appLanguage) {
+                    ForEach(BrowserViewModel.AppLanguage.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
             Section("外观") {
                 Picker("外观模式", selection: $vm.appearanceMode) {
                     ForEach(BrowserViewModel.AppearanceMode.allCases) { Text($0.rawValue).tag($0) }

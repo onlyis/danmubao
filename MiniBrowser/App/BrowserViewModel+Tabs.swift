@@ -23,6 +23,8 @@ extension BrowserViewModel {
     // MARK: - 导航动作
     func open(url: String, title: String? = nil) {
         showSearch = false
+        route = nil        // 打开网址应把网页带到最前：收起任何全屏页面（历史/书签/下载等），避免「点了条目却停在列表页」
+        showMenu = false
         if currentTab == nil { newTab() }   // 没有可用标签（如刚切到无痕）
         if let t = currentTab {
             t.load(url, searchTemplate: searchTemplate)   // 本页面打开；加载遮罩避免看到旧页面
@@ -34,7 +36,10 @@ extension BrowserViewModel {
         scheduleTabPersist()
     }
 
+    /// 回到主页：把**当前标签**本身切回主页态（单一真相源），
+    /// 这样标签卡片/后退按钮/浏览态三者始终一致——不再出现「点了主页但标签还停在旧页」。
     func goHome() {
+        currentTab?.isHome = true   // 让标签与屏幕同步为主页
         isBrowsing = false
         hasVideo = false   // 主页无网页视频，收起悬浮入口
     }
@@ -55,10 +60,16 @@ extension BrowserViewModel {
         // 应用本站已保存的广告隐藏规则（按 host 归一化匹配），随引擎激活生效。
         engine.applyAdHide(AdHideStore.shared.selectors(for: engine.webView.url?.host))
         refreshVideoPresence(for: tab)   // 切到/加载该标签时检测是否有视频
+        startVideoAutoDetect()           // 启动周期检测：视频出现即自动亮出悬浮入口
         engine.onDidFinish = { [weak self, weak tab] in
             guard let self, let tab else { return }
             self.refreshVideoPresence(for: tab)   // 加载完成后重检测视频（驱动悬浮入口显隐）
             if self.defaultVideoRate != 1.0 { tab.engine.videoSetRate(self.defaultVideoRate) }   // 应用默认倍速（无视频时为空操作）
+            // 稍等媒体就绪后自检播放异常（命中则弹「播放异常」提示）；仅对当前标签。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self, weak tab] in
+                guard let self, let tab, tab.id == self.currentTabID else { return }
+                self.checkVideoAnomaly()
+            }
             guard !tab.isIncognito, let pending = tab.pendingHistoryURL else { return }
             let title = tab.engine.title
             guard !title.isEmpty else { return }
@@ -70,6 +81,25 @@ extension BrowserViewModel {
             self?.showToast("开始下载…", symbol: "arrow.down.circle")
         }
         engine.onOpenInBackground = { [weak self] url in self?.openInBackground(url: url.absoluteString) }
+        engine.onOpenInNewTab = { [weak self] url in self?.openInNewTab(url: url.absoluteString) }
+        engine.onBatchSaveImages = { [weak self] in self?.openImageMode(autoSelect: true) }
+    }
+
+    /// 在新标签打开链接并切换过去（长按链接「在新标签页打开」）。
+    func openInNewTab(url: String) {
+        let u = url.trimmingCharacters(in: .whitespaces)
+        guard !u.isEmpty else { return }
+        let tab = Tab(isHome: false, isIncognito: isIncognito)
+        tabIndex[tab.id] = tab
+        if isIncognito { incognitoTabs.append(tab) } else { tabs.append(tab) }   // 末尾
+        currentTabID = tab.id
+        tab.load(u, searchTemplate: searchTemplate)
+        enginePool.touch(tab, current: tab)
+        bindActiveEngine(tab)
+        isBrowsing = true
+        if !isIncognito { library.recordHistory(title: u, url: u) }
+        pagePopTrigger += 1   // 新页面左下角弹出动画
+        scheduleTabPersist()
     }
 
     /// 在后台新标签打开链接（不切换当前标签）
@@ -119,16 +149,25 @@ extension BrowserViewModel {
     func select(_ tab: Tab) {
         currentTabID = tab.id
         isIncognito = tab.isIncognito
+        activateCurrentTab()
+        showTabs = false
+        scheduleTabPersist()
+    }
+
+    /// 让 `currentTab` 成为激活态并同步浏览态（唯一入口，切换/关闭/无痕切换共用）：
+    /// 主页标签 → 收起浏览态；网页标签 → 惰性加载 + 引擎绑定 + 进入浏览态。
+    /// 不触碰 `showTabs`，以便「在标签网格里关闭标签后」能就地续接而不关闭网格。
+    private func activateCurrentTab() {
+        guard let tab = currentTab else { isBrowsing = false; hasVideo = false; return }
         if tab.isHome {
             isBrowsing = false
+            hasVideo = false
         } else {
             tab.activateIfNeeded(searchTemplate: searchTemplate)
             enginePool.touch(tab, current: tab)
             bindActiveEngine(tab)   // 切到该标签时对齐全局夜间/桌面开关
             isBrowsing = true
         }
-        showTabs = false
-        scheduleTabPersist()
     }
 
     /// 后退：优先网页历史，无历史则退回主页
@@ -138,6 +177,16 @@ extension BrowserViewModel {
     }
 
     func forward() {
+        // 主页态：前进 = 回到刚才浏览的网页（配合 goHome 把标签切回主页后的「浏览上一个页面」）。
+        // 引擎仍持有原页面，直接切回浏览态、不重载。
+        if !isBrowsing {
+            guard let t = currentTab, t.hasEngine, !t.engine.displayURL.isEmpty else { return }
+            t.isHome = false
+            enginePool.touch(t, current: t)
+            bindActiveEngine(t)
+            isBrowsing = true
+            return
+        }
         if let engine, engine.canGoForward { engine.goForward() }
     }
 
@@ -155,6 +204,8 @@ extension BrowserViewModel {
 
     func close(_ tab: Tab) {
         let wasCurrent = tab.id == currentTabID
+        // 关闭前记住它在当前模式列表里的位置，关闭后续接「同位置」的邻居（而不是跳回第一个）。
+        let removedIndex = activeTabs.firstIndex { $0.id == tab.id }
         enginePool.remove(tab)
         tabIndex[tab.id] = nil
         withAnimation {
@@ -162,8 +213,17 @@ extension BrowserViewModel {
             else { tabs.removeAll { $0.id == tab.id } }
         }
         if wasCurrent {
-            currentTabID = activeTabs.first?.id
-            isBrowsing = false
+            let remaining = activeTabs
+            if remaining.isEmpty {
+                currentTabID = nil
+                isBrowsing = false
+                hasVideo = false
+            } else {
+                // 邻居 = 原位置右侧那个；若关的是最后一个则取新的最后一个。
+                let idx = min(removedIndex ?? 0, remaining.count - 1)
+                currentTabID = remaining[idx].id
+                activateCurrentTab()   // 同步浏览态/引擎（不关闭标签网格）
+            }
         }
         scheduleTabPersist()
     }
@@ -185,15 +245,7 @@ extension BrowserViewModel {
         withAnimation { isIncognito.toggle() }
         let restored = isIncognito ? incognitoCurrentID : normalCurrentID
         currentTabID = restored ?? activeTabs.first?.id
-        if let t = currentTab, !t.isHome {
-            t.activateIfNeeded(searchTemplate: searchTemplate)
-            enginePool.touch(t, current: t)
-            bindActiveEngine(t)
-            isBrowsing = true
-        } else {
-            isBrowsing = false
-            hasVideo = false
-        }
+        activateCurrentTab()   // 恢复目标模式上次的当前标签并同步浏览态（与 select/close 同一逻辑）
         scheduleTabPersist()
     }
 }

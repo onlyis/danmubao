@@ -33,8 +33,9 @@ final class LibraryStore: ObservableObject {
 
     init() {
         // 属性观察器不在 init 中触发，加载已存数据不会回写
-        bookmarks = DiskStore.load([Bookmark].self, from: PersistenceKey.bookmarks) ?? SampleData.bookmarks
-        history = DiskStore.load([HistorySection].self, from: PersistenceKey.history) ?? SampleData.history
+        // 不再预置示例书签/历史：首次启动为空，全部来自用户真实操作。
+        bookmarks = DiskStore.load([Bookmark].self, from: PersistenceKey.bookmarks) ?? []
+        history = DiskStore.load([HistorySection].self, from: PersistenceKey.history) ?? []
 
         // iCloud：接收远程变更；启动时若云端已有数据则拉取（last-writer-wins 简化策略）
         CloudSync.shared.onRemoteChange = { [weak self] key, data in self?.applyRemote(key: key, data: data) }

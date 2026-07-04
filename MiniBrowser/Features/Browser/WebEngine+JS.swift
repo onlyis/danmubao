@@ -87,7 +87,14 @@ extension WebEngine {
         "(function(){var v=document.querySelector('video');if(!v)return null;\(body)})();"
     }
     func videoTogglePlay() { webView.evaluateJavaScript(videoScript("if(v.paused){v.play()}else{v.pause()}")) }
-    func videoSetRate(_ rate: Double) { webView.evaluateJavaScript(videoScript("v.playbackRate=\(rate);")) }
+    /// 设置倍速：支持到 7×（最高钳到 16×，最低 0.0625×）。同时写 playbackRate 与 defaultPlaybackRate，
+    /// 减少部分站点在 ratechange 后把速度重置回 1× 的情况。
+    func videoSetRate(_ rate: Double) {
+        let r = max(0.0625, min(rate, 16))
+        webView.evaluateJavaScript(videoScript("try{v.playbackRate=\(r);v.defaultPlaybackRate=\(r);}catch(e){}"))
+    }
+    /// 重新加载页面首个 <video>（播放异常时的「重试」）。
+    func videoReload() { webView.evaluateJavaScript(videoScript("try{v.load();v.play();}catch(e){}")) }
     func videoSeek(by seconds: Double) { webView.evaluateJavaScript(videoScript("v.currentTime=Math.max(0,(v.currentTime||0)+(\(seconds)));")) }
     func videoRequestPiP() {
         // 调起 WKWebView 内置的画中画（需页面视频支持）。
@@ -107,15 +114,43 @@ extension WebEngine {
         }
     }
 
+    /// 播放异常检测：遍历可见 <video>，命中首个带 MediaError 或「有源但无可用媒体源」的视频。
+    /// 回传其错误码（1 中止 / 2 网络 / 3 解码 / 4 源不支持），无异常回传 nil。
+    struct VideoAnomaly { var code: Int; var message: String }
+    func checkVideoAnomaly(_ completion: @escaping (VideoAnomaly?) -> Void) {
+        let js = """
+        (function(){
+          var vs=document.getElementsByTagName('video');
+          for(var i=0;i<vs.length;i++){
+            var v=vs[i], r=v.getBoundingClientRect();
+            if(r.width<2||r.height<2) continue;         // 跳过隐藏/占位视频，避免误报
+            if(v.error){ return {code:v.error.code||0, msg:v.error.message||''}; }
+            if((v.currentSrc||v.src) && v.networkState===3){ return {code:4, msg:''}; } // NETWORK_NO_SOURCE
+          }
+          return null;
+        })();
+        """
+        webView.evaluateJavaScript(js) { result, _ in
+            guard let d = result as? [String: Any] else { completion(nil); return }
+            completion(VideoAnomaly(code: d["code"] as? Int ?? 0, message: (d["msg"] as? String) ?? ""))
+        }
+    }
+
     func applyNight(_ on: Bool) {
         nightMode = on
+        // 夜间时把 webView 底色设为深色：加载新页、内容未绘制前也是深色，避免「先闪一下白」。
+        webView.isOpaque = !on
+        let bg: UIColor? = on ? UIColor(white: 0.067, alpha: 1) : nil   // #111
+        webView.backgroundColor = bg
+        webView.scrollView.backgroundColor = bg
         injectNightCSS()
     }
 
     /// 按 `nightMode` 注入或移除反色样式（导航后 document 会丢失，需重注入）。
+    /// 注入到 head 或 documentElement（didCommit 早期 head 可能尚未生成），保证尽早生效、不闪白。
     func injectNightCSS() {
         let js = nightMode
-        ? "var s=document.getElementById('__mb_night');if(!s){s=document.createElement('style');s.id='__mb_night';document.head.appendChild(s);}s.innerHTML='html{filter:invert(1) hue-rotate(180deg)!important;background:#111!important}img,video,picture,svg,canvas{filter:invert(1) hue-rotate(180deg)!important}';"
+        ? "var s=document.getElementById('__mb_night');if(!s){s=document.createElement('style');s.id='__mb_night';(document.head||document.documentElement).appendChild(s);}s.innerHTML='html{filter:invert(1) hue-rotate(180deg)!important;background:#111!important}img,video,picture,svg,canvas{filter:invert(1) hue-rotate(180deg)!important}';"
         : "var s=document.getElementById('__mb_night');if(s)s.remove();"
         webView.evaluateJavaScript(js)
     }
@@ -453,6 +488,18 @@ extension WebEngine {
               }
             }
           });
+          // 额外：扫描整页 HTML 里出现的媒体直链（含 HLS/m3u8、mp4、flv、ts、mp3 等，
+          // 覆盖由 JS 注入而不在 DOM <source> 里的常见流地址），支持「不同类型下载」。
+          try {
+            var html = document.documentElement.innerHTML;
+            var re = /https?:\\/\\/[^"'\\s<>()]+?\\.(m3u8|mp4|m4s|flv|webm|mkv|mov|mp3|m4a|aac|ts)(\\?[^"'\\s<>()]*)?/gi;
+            var m, n = 0;
+            while ((m = re.exec(html)) && n < 60){
+              n++;
+              var ext = (m[1] || '').toLowerCase();
+              add(m[0], /mp3|m4a|aac/.test(ext) ? 'audio' : 'video', document.body);
+            }
+          } catch(e){}
           // 按 url 去重，保留首次出现。
           var seen = {}, dedup = [];
           for (var k=0;k<out.length;k++){

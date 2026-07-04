@@ -44,7 +44,8 @@ struct MainMenuSheet: View {
             statusBar
         }
         .padding(.top, Theme.Spacing.s)
-        .background((vm.isIncognito ? Color(hex: 0x111114) : Theme.Colors.card).ignoresSafeArea())
+        // 无痕不再把菜单整体染黑（无痕的深色标识只放顶部地址栏）；夜间模式下随 App 深色自动变深。
+        .background(Theme.Colors.card.ignoresSafeArea())
     }
 
     /// 手动构造对某一页的绑定（改某页 → 触发 vm.menuItems didSet 落盘）。
@@ -110,7 +111,8 @@ struct MainMenuSheet: View {
 enum MenuCatalog {
     static let page1: [MenuAction] = [
         .init(title: "设置", symbol: "gearshape"),
-        .init(title: "书签", symbol: "bookmark"),
+        .init(title: "加入书签", symbol: "bookmark"),
+        .init(title: "书签", symbol: "bookmark.fill"),
         .init(title: "历史", symbol: "clock.arrow.circlepath"),
         .init(title: "下载", symbol: "arrow.down.circle"),
         .init(title: "文件", symbol: "folder"),
@@ -164,6 +166,7 @@ enum MenuCatalog {
         .init(title: "AirPlay", symbol: "airplayvideo"),
         .init(title: "DLNA投屏", symbol: "tv"),
         .init(title: "倍速播放", symbol: "gauge.with.dots.needle.67percent"),
+        .init(title: "检测播放异常", symbol: "exclamationmark.triangle"),
         .init(title: "单曲循环", symbol: "repeat.1"),
         .init(title: "镜像播放", symbol: "arrow.left.and.right.righttriangle.left.righttriangle.right"),
         .init(title: "视频截图", symbol: "camera"),

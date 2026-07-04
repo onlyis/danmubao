@@ -37,13 +37,6 @@ struct DownloadsView: View {
             Image(systemName: "arrow.down.circle").font(.system(size: 46)).foregroundStyle(Theme.Colors.tertiaryText)
             Text("暂无下载").font(.system(size: 16, weight: .medium))
             Text("在网页中长按链接或资源即可下载").font(.system(size: 13)).foregroundStyle(Theme.Colors.secondaryText)
-            Button {
-                manager.start(urlString: "https://www.bing.com")
-            } label: {
-                Text("下载示例文件").padding(.horizontal, 18).padding(.vertical, 9)
-                    .background(Theme.Colors.accent, in: Capsule()).foregroundStyle(.white)
-            }
-            .padding(.top, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.background)

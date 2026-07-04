@@ -39,11 +39,20 @@ enum Wallpaper: String, CaseIterable, Identifiable {
             LinearGradient(colors: [Color(hex: 0x00C9A7), Color(hex: 0x2B86C5), Color(hex: 0x845EC2)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
         case .blur:
-            ZStack {
-                LinearGradient(colors: [Color(hex: 0x355C7D), Color(hex: 0x6C5B7B), Color(hex: 0xC06C84)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                Circle().fill(.white.opacity(0.18)).frame(width: 260).blur(radius: 60).offset(x: -90, y: -160)
-                Circle().fill(Color(hex: 0xFFD54F).opacity(0.25)).frame(width: 220).blur(radius: 70).offset(x: 110, y: 120)
+            // 用 GeometryReader 让光斑按容器尺寸缩放：全屏壁纸与设置页小缩略图都比例正确
+            // （原来固定 260/220pt 在 150pt 高的缩略图里会撑爆、错位）。
+            GeometryReader { geo in
+                let s = min(geo.size.width, geo.size.height)
+                ZStack {
+                    LinearGradient(colors: [Color(hex: 0x355C7D), Color(hex: 0x6C5B7B), Color(hex: 0xC06C84)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Circle().fill(.white.opacity(0.18))
+                        .frame(width: s * 1.1).blur(radius: s * 0.24)
+                        .offset(x: -geo.size.width * 0.35, y: -geo.size.height * 0.4)
+                    Circle().fill(Color(hex: 0xFFD54F).opacity(0.25))
+                        .frame(width: s * 0.9).blur(radius: s * 0.28)
+                        .offset(x: geo.size.width * 0.35, y: geo.size.height * 0.35)
+                }
             }
         }
     }

@@ -100,8 +100,8 @@ private struct MediaHitRow: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Text(hit.kind.label)
-                    .font(.system(size: 11, weight: .medium))
+                Text(hit.format)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.Colors.secondaryText)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Theme.Colors.groupedBackground, in: Capsule())

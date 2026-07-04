@@ -1,0 +1,24 @@
+# Fastlane Deliverfile —— App Store 元数据上传配置
+# 文案/分类等都从 metadata/ 目录读取，改文件即可，改完重跑 `fastlane upload_metadata`。
+
+app_identifier "is.any.app.danmubao"
+
+# 分类（可改）：娱乐 / 工具
+primary_category "ENTERTAINMENT"
+secondary_category "UTILITIES"
+
+# 只传元数据，不传二进制（IPA 走 Xcode/单独 lane）
+skip_binary_upload true
+
+# 截图就绪前先跳过；截好放进 metadata/<locale>/<device>/ 后改成 false
+skip_screenshots true
+
+# 不自动提审、不自动发布——你在 ASC 里确认无误再手动提交
+submit_for_review false
+automatic_release false
+
+# 跳过上传前的 HTML 预览确认（CI / 无人值守）
+force true
+
+# 不做 IAP 预检
+precheck_include_in_app_purchases false

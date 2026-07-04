@@ -4,19 +4,33 @@ import SwiftUI
 struct InlineSearchView: View {
     @EnvironmentObject var vm: BrowserViewModel
     @State private var query = ""
+    /// 打开时预填的内容（浏览态传当前页完整 URL，便于就地编辑）。
+    var initialText: String = ""
     var onSubmit: (String) -> Void
     var onCancel: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            SearchInputField(query: $query, onSubmit: submit, onCancel: onCancel)
-                .padding(.horizontal, Theme.Spacing.l)
-                .padding(.vertical, Theme.Spacing.s)
+            if vm.searchBarAtTop { inputField }   // 顶部模式：输入框在最上
             SearchSuggestionList(query: query, onPick: submit)
         }
         .background(Theme.Colors.background.ignoresSafeArea())
-        // 键盘上方的引擎条：自定义普通白底（非系统玻璃工具栏），首位固定「取消」
-        .safeAreaInset(edge: .bottom, spacing: 0) { engineBar }
+        .onAppear { if query.isEmpty { query = initialText } }
+        // 键盘上方：默认「引擎条在上、搜索输入框在下（贴着键盘）」；顶部模式仅放引擎条。
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                engineBar
+                if !vm.searchBarAtTop { inputField }
+            }
+        }
+    }
+
+    /// 搜索输入框（顶部或键盘上方复用）。
+    private var inputField: some View {
+        SearchInputField(query: $query, onSubmit: submit, onCancel: onCancel)
+            .padding(.horizontal, Theme.Spacing.l)
+            .padding(.vertical, Theme.Spacing.s)
+            .background(Theme.Colors.background)
     }
 
     /// 键盘上方引擎条：固定「取消」 + 可横滑的 URL 片段/引擎卡

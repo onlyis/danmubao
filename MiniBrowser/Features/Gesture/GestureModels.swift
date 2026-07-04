@@ -6,6 +6,9 @@ enum GestureDirection: String, Codable, CaseIterable, Hashable {
     /// 圆形手势（顺时针 / 逆时针），由转角和识别，不由 `from(dx:dy:)` 产生。
     case circleClockwise, circleCounterClockwise
 
+    /// 8 个线性方向（不含圆形）：用于手动追加方向的宫格。
+    static let linearCases: [GestureDirection] = [.up, .down, .left, .right, .upLeft, .upRight, .downLeft, .downRight]
+
     var glyph: String {
         switch self {
         case .up: return "↑"; case .down: return "↓"; case .left: return "←"; case .right: return "→"
@@ -37,10 +40,11 @@ extension Array where Element == GestureDirection {
 
 // MARK: - 功能
 enum GestureAction: String, Codable, CaseIterable, Identifiable {
-    case back, forward, reload, newTab, closeTab, home, tabs, menu
+    case back, forward, reload, newTab, closeTab, home, tabs, menu, search
     case bookmarks, history, downloads, files, settings
     case toggleNight, toggleIncognito, translate, reading, imageMode, qrScan
     case addBookmark, copyURL, scrollTop, scrollBottom
+    case screenshot, nextTab, prevTab
 
     var id: String { rawValue }
 
@@ -50,6 +54,7 @@ enum GestureAction: String, Codable, CaseIterable, Identifiable {
         case .reload: return "刷新";          case .newTab: return "新建标签页"
         case .closeTab: return "关闭标签页";  case .home: return "返回主页"
         case .tabs: return "标签页管理";      case .menu: return "打开菜单"
+        case .search: return "搜索"
         case .bookmarks: return "书签";       case .history: return "历史"
         case .downloads: return "下载";       case .files: return "文件"
         case .settings: return "设置";        case .toggleNight: return "夜间模式"
@@ -58,6 +63,8 @@ enum GestureAction: String, Codable, CaseIterable, Identifiable {
         case .qrScan: return "扫一扫";        case .addBookmark: return "收藏页面"
         case .copyURL: return "复制网址";     case .scrollTop: return "回到顶部"
         case .scrollBottom: return "滚到底部"
+        case .screenshot: return "网页截图";  case .nextTab: return "下一个标签"
+        case .prevTab: return "上一个标签"
         }
     }
 
@@ -67,6 +74,7 @@ enum GestureAction: String, Codable, CaseIterable, Identifiable {
         case .reload: return "arrow.clockwise"; case .newTab: return "plus.square"
         case .closeTab: return "xmark.square"; case .home: return "house"
         case .tabs: return "square.on.square"; case .menu: return "line.3.horizontal"
+        case .search: return "magnifyingglass"
         case .bookmarks: return "bookmark";   case .history: return "clock.arrow.circlepath"
         case .downloads: return "arrow.down.circle"; case .files: return "folder"
         case .settings: return "gearshape";   case .toggleNight: return "moon"
@@ -75,6 +83,8 @@ enum GestureAction: String, Codable, CaseIterable, Identifiable {
         case .qrScan: return "qrcode.viewfinder"; case .addBookmark: return "bookmark.fill"
         case .copyURL: return "doc.on.doc";   case .scrollTop: return "arrow.up.to.line"
         case .scrollBottom: return "arrow.down.to.line"
+        case .screenshot: return "camera.viewfinder"; case .nextTab: return "arrow.right.square"
+        case .prevTab: return "arrow.left.square"
         }
     }
 }
@@ -127,7 +137,8 @@ struct GestureConfig: Codable {
     var distinctIcon: Bool = true
 
     /// 直线容差角（度）：相邻段方向偏离当前直线段在此角度内不算转向。
-    var straightnessToleranceDeg: Double { 25 + straightness * 50 }   // 25°…75°
+    /// 上限必须 < 45°，否则相邻的 8 向（如 ← 与 ↙）会被并成同一段——导致「左都识别成左下」。
+    var straightnessToleranceDeg: Double { 12 + straightness * 28 }   // 12°…40°
 
     init() {}
     /// 容错解码：旧配置缺新字段时用默认值，避免整份配置丢失。
@@ -151,8 +162,8 @@ enum GestureRecognizer {
     /// segment：判定一段方向所需的最小位移。
     /// toleranceDeg：直线容差角——线偏离当前直线段在此角度内不算转向（弯一点也当直线）。
     /// detectCircle：是否优先识别圆形。
-    static func recognize(_ points: [CGPoint], segment: CGFloat = 26,
-                          toleranceDeg: Double = 50, detectCircle: Bool = true) -> [GestureDirection] {
+    static func recognize(_ points: [CGPoint], segment: CGFloat = 22,
+                          toleranceDeg: Double = 30, detectCircle: Bool = true) -> [GestureDirection] {
         guard points.count > 1 else { return [] }
         if detectCircle, let circle = circle(points) { return [circle] }
         var result: [GestureDirection] = []
@@ -162,12 +173,15 @@ enum GestureRecognizer {
             let dx = p.x - anchor.x, dy = p.y - anchor.y
             if hypot(dx, dy) < segment { continue }
             let angle = atan2(dy, dx) * 180 / .pi
-            // 仍在当前直线段容差内：视作同一直线，继续累积（不动 anchor，弯曲被吸收）
+            // 关键：每形成一小段就推进 anchor，方向按「最近这一小段」判定（短基线）。
+            // 否则用远锚点测角，转弯后「远锚点→当前点」会是对角线混合——
+            // 导致「左→下」被读成「左下」，且「下」要拉很长才够纵向分量。
+            anchor = p
+            // 仍在当前直线段容差内：视作同一方向的延续（吸收轻微抖动），不新增方向。
             if let ra = runAngle, abs(angleDelta(angle, ra)) <= toleranceDeg { continue }
             let dir = GestureDirection.from(dx: dx, dy: dy)
             if result.last != dir { result.append(dir) }
             runAngle = angle
-            anchor = p
         }
         return result
     }

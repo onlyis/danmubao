@@ -42,7 +42,7 @@ struct RootView: View {
                     HomeView()
                 }
             }
-            .padding(.bottom, Theme.Size.toolbarHeight)
+            .padding(.bottom, vm.isFullScreen ? 0 : Theme.Size.toolbarHeight)   // 全屏时不再为已隐藏的工具栏留位
             .scaleEffect(pagePop, anchor: .bottomLeading)   // 新建标签：从左下角弹出（快）
             .onChange(of: vm.pagePopTrigger) { _, _ in
                 pagePop = 0.1
@@ -58,10 +58,11 @@ struct RootView: View {
         // 底部主菜单
         .sheet(isPresented: $vm.showMenu) {
             MainMenuSheet()
-                .presentationDetents([.height(560), .large])
+                // 默认只露约三行宫格（更克制）；可上拉展开到 large 看全部
+                .presentationDetents([.height(400), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Theme.Radius.sheet)
-                .presentationBackground(vm.isIncognito ? Color(hex: 0x111114) : Theme.Colors.card)
+                .presentationBackground(Theme.Colors.card)
         }
         // 标签页管理：覆盖层瞬时显示/消失（不显示标签淡出动画，只看新页面弹出）
         .overlay {
@@ -115,6 +116,7 @@ struct RootView: View {
         .overlay {
             if vm.showSearch {
                 InlineSearchView(
+                    initialText: vm.isBrowsing ? vm.currentFullURL : "",
                     onSubmit: { q in vm.recordSearch(q); vm.open(url: q, title: q); vm.showSearch = false },
                     onCancel: { vm.showSearch = false }
                 )
@@ -167,9 +169,20 @@ struct RootView: View {
             }
         }
         .modifier(TranslationPresenterModifier())
-        // 全局轻提示
+        // 视频播放异常提示（加载后自检命中，或菜单手动检测）
+        .alert("播放异常", isPresented: Binding(
+            get: { vm.videoAnomaly != nil },
+            set: { if !$0 { vm.videoAnomaly = nil } }
+        )) {
+            Button("重试") { vm.retryVideo() }
+            Button("嗅探下载") { vm.videoAnomaly = nil; vm.openMediaSniffer() }
+            Button("忽略", role: .cancel) { vm.videoAnomaly = nil }
+        } message: {
+            Text(vm.videoAnomaly?.text ?? "")
+        }
+        // 全局轻提示（永不拦截触摸，避免提示浮层挡住点击）
         .overlay {
-            if let toast = toasts.toast { ToastView(message: toast) }
+            if let toast = toasts.toast { ToastView(message: toast).allowsHitTesting(false) }
         }
     }
 
