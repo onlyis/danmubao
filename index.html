@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Danmu Bao</title>
+  <style>
+    body{margin:0;background:#0a0a0a;color:#eee8d8;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:760px;margin:0 auto;padding:56px 22px}
+    h1{font-size:32px;line-height:1.15;margin:0 0 12px}
+    a{color:#ffb000}
+    nav{display:flex;gap:14px;flex-wrap:wrap;margin-top:28px}
+  </style>
+</head>
+<body>
+  <main>
+    <h1 data-i18n="title">Danmu Bao</h1>
+    <p data-i18n="intro">Turn your phone into a glowing scrolling text banner for concerts, pickups, birthdays and cheering.</p>
+    <nav>
+      <a href="./privacy.html" data-i18n="privacy">Privacy Policy</a>
+      <a href="./support.html" data-i18n="support">Support</a>
+      <a href="./terms.html" data-i18n="terms">Terms of Use</a>
+    </nav>
+  </main>
+  <script>
+    const zh = /^zh/i.test(navigator.language || '');
+    const text = zh ? {
+      title: '弹幕宝',
+      intro: '把手机变成会发光的滚动文字灯牌，适合演唱会、接机、生日和加油打气。',
+      privacy: '隐私政策',
+      support: '支持',
+      terms: '使用条款'
+    } : {
+      title: 'Danmu Bao',
+      intro: 'Turn your phone into a glowing scrolling text banner for concerts, pickups, birthdays and cheering.',
+      privacy: 'Privacy Policy',
+      support: 'Support',
+      terms: 'Terms of Use'
+    };
+    document.documentElement.lang = zh ? 'zh-CN' : 'en';
+    document.title = text.title;
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = text[el.dataset.i18n]; });
+  </script>
+</body>
+</html>

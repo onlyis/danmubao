@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Privacy Policy</title>
+  <style>
+    body{margin:0;background:#0a0a0a;color:#eee8d8;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:760px;margin:0 auto;padding:44px 22px}
+    h1{font-size:28px;line-height:1.2}
+    a{color:#ffb000}
+  </style>
+</head>
+<body>
+  <main>
+    <h1 data-i18n="title">Privacy Policy</h1>
+    <p data-i18n="updated">Last updated: 2026-07-04</p>
+    <p data-i18n="p1">Danmu Bao is designed to run locally on your device. We do not require an account and we do not collect, sell, or share personal data.</p>
+    <p data-i18n="p2">Saved banners and preferences are stored on your device. In-app purchases are processed by Apple through StoreKit. We do not receive your payment card details.</p>
+    <p data-i18n="p3">If this changes in a future version, this policy will be updated before the related feature is released.</p>
+    <p><span data-i18n="contact">Contact:</span> <a href="https://github.com/onlyis/danmubao/issues">GitHub Issues</a></p>
+  </main>
+  <script>
+    const zh = /^zh/i.test(navigator.language || '');
+    const text = zh ? {
+      title: '隐私政策',
+      updated: '最后更新：2026-07-04',
+      p1: '弹幕宝尽可能在设备本地运行，不要求注册账号，不收集、出售或共享个人信息。',
+      p2: '已保存的灯牌和偏好设置存储在你的设备上。App 内购买由 Apple StoreKit 处理，我们不会接触你的银行卡或支付卡信息。',
+      p3: '如果未来版本引入会影响隐私的新功能，我们会在功能发布前更新本政策。',
+      contact: '联系：'
+    } : {
+      title: 'Privacy Policy',
+      updated: 'Last updated: 2026-07-04',
+      p1: 'Danmu Bao is designed to run locally on your device. We do not require an account and we do not collect, sell, or share personal data.',
+      p2: 'Saved banners and preferences are stored on your device. In-app purchases are processed by Apple through StoreKit. We do not receive your payment card details.',
+      p3: 'If this changes in a future version, this policy will be updated before the related feature is released.',
+      contact: 'Contact:'
+    };
+    document.documentElement.lang = zh ? 'zh-CN' : 'en';
+    document.title = text.title;
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = text[el.dataset.i18n]; });
+  </script>
+</body>
+</html>
