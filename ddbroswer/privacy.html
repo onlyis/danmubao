@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>隐私政策 - 千千手势浏览器</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111; background: #fff; }
+    main { max-width: 840px; margin: 0 auto; padding: 40px 20px 72px; }
+    h1 { margin: 0 0 12px; font-size: 30px; }
+    h2 { margin: 28px 0 10px; font-size: 20px; }
+    p, li { margin: 0 0 12px; color: #333; }
+    ul { margin: 0 0 12px 20px; padding: 0; }
+    .muted { color: #666; font-size: 14px; }
+    a { color: #0a66ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="title"></h1>
+    <p id="intro"></p>
+
+    <h2 id="h-data"></h2>
+    <p id="data-text"></p>
+
+    <h2 id="h-network"></h2>
+    <p id="network-text"></p>
+
+    <h2 id="h-permissions"></h2>
+    <ul id="permissions"></ul>
+
+    <h2 id="h-delete"></h2>
+    <p id="delete-text"></p>
+
+    <p class="muted" id="updated"></p>
+    <p><a href="./index.html" id="back"></a></p>
+  </main>
+
+  <script>
+    const copy = {
+      zh: {
+        lang: "zh-CN",
+        title: "隐私政策",
+        intro: "千千手势浏览器把数据处理尽量留在设备本地。我们不建立应用账号，也不收集与你无关的个人资料。",
+        dataH: "我们处理的数据",
+        data: "浏览历史、书签、下载记录、标签会话、搜索历史、设置和快捷入口会保存在你的设备本地。若你开启 iCloud 同步，书签和历史会通过你自己的 iCloud 账户在设备间同步。",
+        networkH: "网络请求",
+        network: "你访问的网站内容由系统 WebKit 直接加载，搜索词会发送给你选择的搜索引擎服务商。我们不会替你额外收集或转发这些内容。",
+        permH: "权限",
+        perms: [
+          "相机：仅用于二维码扫描。",
+          "照片：仅用于保存图片或从相册选择图片识别二维码。",
+          "本地网络：仅用于同一局域网内的文件传输。"
+        ],
+        deleteH: "数据清除",
+        deleteText: "你可以在应用内清除历史、Cookie、缓存和下载内容。卸载应用会移除本地保存的数据。无痕浏览会话只存在于内存中，退出后自动清空。",
+        updated: "最近更新：2026-07-05",
+        back: "返回首页"
+      },
+      en: {
+        lang: "en",
+        title: "Privacy Policy",
+        intro: "DD-Broswer keeps data processing on device whenever possible. We do not require an account and do not collect unrelated personal data.",
+        dataH: "Data we handle",
+        data: "Browsing history, bookmarks, downloads, tab sessions, search history, settings, and quick links are stored locally on your device. If you enable iCloud sync, bookmarks and history are synced only through your own iCloud account.",
+        networkH: "Network requests",
+        network: "WebKit loads the websites you visit directly, and search queries go to the search provider you selected in settings. We do not collect or forward that content ourselves.",
+        permH: "Permissions",
+        perms: [
+          "Camera: QR code scanning only.",
+          "Photos: saving images or picking a photo to decode a QR code.",
+          "Local network: file transfer on the same Wi-Fi network only."
+        ],
+        deleteH: "Data removal",
+        deleteText: "You can clear history, cookies, cache, and downloads inside the app. Uninstalling the app removes local data. Private browsing stays in memory only and clears when you leave.",
+        updated: "Last updated: 2026-07-05",
+        back: "Back to home"
+      }
+    };
+
+    const lang = (navigator.language || "zh").toLowerCase().startsWith("en") ? "en" : "zh";
+    const t = copy[lang];
+    document.documentElement.lang = t.lang;
+    document.title = `${t.title} - 千千手势浏览器`;
+
+    document.getElementById("title").textContent = t.title;
+    document.getElementById("intro").textContent = t.intro;
+    document.getElementById("h-data").textContent = t.dataH;
+    document.getElementById("data-text").textContent = t.data;
+    document.getElementById("h-network").textContent = t.networkH;
+    document.getElementById("network-text").textContent = t.network;
+    document.getElementById("h-permissions").textContent = t.permH;
+    document.getElementById("h-delete").textContent = t.deleteH;
+    document.getElementById("delete-text").textContent = t.deleteText;
+    document.getElementById("updated").textContent = t.updated;
+    document.getElementById("back").textContent = t.back;
+
+    const list = document.getElementById("permissions");
+    t.perms.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      list.appendChild(li);
+    });
+  </script>
+</body>
+</html>
