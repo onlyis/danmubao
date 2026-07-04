@@ -8,8 +8,8 @@
     :root { color-scheme: light; }
     body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111; background: #fff; }
     main { max-width: 840px; margin: 0 auto; padding: 40px 20px 72px; }
-    h1 { margin: 0 0 12px; font-size: 30px; }
-    h2 { margin: 28px 0 10px; font-size: 20px; }
+    h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.2; }
+    h2 { margin: 28px 0 10px; font-size: 20px; line-height: 1.3; }
     p, li { margin: 0 0 12px; color: #333; }
     ul { margin: 0 0 12px 20px; padding: 0; }
     .muted { color: #666; font-size: 14px; }
@@ -21,17 +21,23 @@
     <h1 id="title"></h1>
     <p id="intro"></p>
 
-    <h2 id="h-data"></h2>
-    <p id="data-text"></p>
+    <h2 id="h-collect"></h2>
+    <p id="collect"></p>
 
-    <h2 id="h-network"></h2>
-    <p id="network-text"></p>
+    <h2 id="h-use"></h2>
+    <p id="use"></p>
 
-    <h2 id="h-permissions"></h2>
-    <ul id="permissions"></ul>
+    <h2 id="h-share"></h2>
+    <p id="share"></p>
 
-    <h2 id="h-delete"></h2>
-    <p id="delete-text"></p>
+    <h2 id="h-permission"></h2>
+    <ul id="permission-list"></ul>
+
+    <h2 id="h-choice"></h2>
+    <p id="choice"></p>
+
+    <h2 id="h-contact"></h2>
+    <p id="contact"></p>
 
     <p class="muted" id="updated"></p>
     <p><a href="./index.html" id="back"></a></p>
@@ -42,38 +48,46 @@
       zh: {
         lang: "zh-CN",
         title: "隐私政策",
-        intro: "千千手势浏览器把数据处理尽量留在设备本地。我们不建立应用账号，也不收集与你无关的个人资料。",
-        dataH: "我们处理的数据",
-        data: "浏览历史、书签、下载记录、标签会话、搜索历史、设置和快捷入口会保存在你的设备本地。若你开启 iCloud 同步，书签和历史会通过你自己的 iCloud 账户在设备间同步。",
-        networkH: "网络请求",
-        network: "你访问的网站内容由系统 WebKit 直接加载，搜索词会发送给你选择的搜索引擎服务商。我们不会替你额外收集或转发这些内容。",
-        permH: "权限",
-        perms: [
+        intro: "千千手势浏览器坚持尽量在设备本地处理数据，不建立应用账号，不出售个人信息。",
+        collectH: "我们收集什么",
+        collect: "我们不会主动收集你的姓名、手机号、邮箱或通讯录。浏览历史、书签、标签、下载记录、设置和搜索历史默认保存在本机；如你开启同步，这些数据只会通过你自己的 iCloud 账户同步。",
+        useH: "我们如何使用",
+        use: "这些数据仅用于实现浏览、标签管理、书签同步、下载、搜索、阅读模式和其他本地功能。",
+        shareH: "我们如何共享",
+        share: "我们不会把你的数据卖给第三方，也不会为了广告目的共享数据。网页内容由你访问的网站直接提供，搜索词会发送给你选择的搜索引擎服务商。",
+        permissionH: "权限",
+        permissions: [
           "相机：仅用于二维码扫描。",
-          "照片：仅用于保存图片或从相册选择图片识别二维码。",
+          "照片：仅用于保存图片或从相册识别二维码。",
           "本地网络：仅用于同一局域网内的文件传输。"
         ],
-        deleteH: "数据清除",
-        deleteText: "你可以在应用内清除历史、Cookie、缓存和下载内容。卸载应用会移除本地保存的数据。无痕浏览会话只存在于内存中，退出后自动清空。",
+        choiceH: "你的选择",
+        choice: "你可以随时在应用内清除历史、Cookie、缓存、下载内容和标签数据。卸载应用会移除本地存储的数据。无痕浏览会话退出后自动清空。",
+        contactH: "联系我们",
+        contact: "如果你对隐私政策有问题，可以通过项目支持页反馈。",
         updated: "最近更新：2026-07-05",
         back: "返回首页"
       },
       en: {
         lang: "en",
         title: "Privacy Policy",
-        intro: "DD-Broswer keeps data processing on device whenever possible. We do not require an account and do not collect unrelated personal data.",
-        dataH: "Data we handle",
-        data: "Browsing history, bookmarks, downloads, tab sessions, search history, settings, and quick links are stored locally on your device. If you enable iCloud sync, bookmarks and history are synced only through your own iCloud account.",
-        networkH: "Network requests",
-        network: "WebKit loads the websites you visit directly, and search queries go to the search provider you selected in settings. We do not collect or forward that content ourselves.",
-        permH: "Permissions",
-        perms: [
+        intro: "DD-Broswer keeps data processing on device whenever possible. We do not require an account and we do not sell personal information.",
+        collectH: "What we collect",
+        collect: "We do not actively collect your name, phone number, email address, or contacts. Browsing history, bookmarks, tabs, downloads, settings, and search history are stored locally by default; if you enable sync, that data syncs only through your own iCloud account.",
+        useH: "How we use it",
+        use: "We use that data only to provide browsing, tab management, bookmark sync, downloads, search, reader mode, and other local app features.",
+        shareH: "How we share it",
+        share: "We do not sell your data and we do not share it for advertising purposes. Website content comes directly from the sites you visit, and search queries go to the search provider you select in settings.",
+        permissionH: "Permissions",
+        permissions: [
           "Camera: QR code scanning only.",
-          "Photos: saving images or picking a photo to decode a QR code.",
+          "Photos: saving images or decoding a QR code from your photo library.",
           "Local network: file transfer on the same Wi-Fi network only."
         ],
-        deleteH: "Data removal",
-        deleteText: "You can clear history, cookies, cache, and downloads inside the app. Uninstalling the app removes local data. Private browsing stays in memory only and clears when you leave.",
+        choiceH: "Your choices",
+        choice: "You can clear history, cookies, cache, downloads, and tab data at any time in the app. Uninstalling the app removes local data. Private browsing sessions clear automatically when you leave.",
+        contactH: "Contact",
+        contact: "If you have a privacy question, please use the project support page.",
         updated: "Last updated: 2026-07-05",
         back: "Back to home"
       }
@@ -86,18 +100,22 @@
 
     document.getElementById("title").textContent = t.title;
     document.getElementById("intro").textContent = t.intro;
-    document.getElementById("h-data").textContent = t.dataH;
-    document.getElementById("data-text").textContent = t.data;
-    document.getElementById("h-network").textContent = t.networkH;
-    document.getElementById("network-text").textContent = t.network;
-    document.getElementById("h-permissions").textContent = t.permH;
-    document.getElementById("h-delete").textContent = t.deleteH;
-    document.getElementById("delete-text").textContent = t.deleteText;
+    document.getElementById("h-collect").textContent = t.collectH;
+    document.getElementById("collect").textContent = t.collect;
+    document.getElementById("h-use").textContent = t.useH;
+    document.getElementById("use").textContent = t.use;
+    document.getElementById("h-share").textContent = t.shareH;
+    document.getElementById("share").textContent = t.share;
+    document.getElementById("h-permission").textContent = t.permissionH;
+    document.getElementById("h-choice").textContent = t.choiceH;
+    document.getElementById("choice").textContent = t.choice;
+    document.getElementById("h-contact").textContent = t.contactH;
+    document.getElementById("contact").textContent = t.contact;
     document.getElementById("updated").textContent = t.updated;
     document.getElementById("back").textContent = t.back;
 
-    const list = document.getElementById("permissions");
-    t.perms.forEach((item) => {
+    const list = document.getElementById("permission-list");
+    t.permissions.forEach((item) => {
       const li = document.createElement("li");
       li.textContent = item;
       list.appendChild(li);
