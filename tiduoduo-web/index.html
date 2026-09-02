@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>题多多 - 刷题与知识学习</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #5f6b73; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2f66f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 980px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1 { margin: 0 0 12px; font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: 0; }
+    h2 { margin: 40px 0 12px; font-size: 24px; line-height: 1.25; }
+    p { margin: 0 0 16px; color: var(--muted); }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .lead { max-width: 760px; font-size: 19px; color: #324047; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 30px; }
+    .card { display: block; min-height: 112px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; text-decoration: none; }
+    .card strong { display: block; margin-bottom: 8px; font-size: 18px; }
+    .card span { color: var(--muted); }
+    .features { columns: 2 280px; padding-left: 20px; color: #35424a; }
+    .features li { margin: 0 0 8px; break-inside: avoid; }
+    .meta { margin-top: 36px; font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '题多多',
+      lead1: '题多多是一款面向考试备考的刷题与知识学习应用。你可以按科目刷题、章节练习、模拟考试，通过 AI 答疑与知识点学习高效复习，随时查看自己的学习数据。',
+      lead2: '题多多提供题库刷题、分类学习、数据中心、知识点学习、AI 答疑、错题本、收藏笔记、离线练习和自定义题库等功能。',
+      cards: [
+        { h: '隐私政策', d: '了解题多多如何收集、使用和保护你的个人信息。', u: './privacy.html' },
+        { h: '支持与联系', d: '查看常见问题、反馈渠道和提交问题时需要提供的信息。', u: './support.html' },
+        { h: '用户协议', d: '了解题多多的使用规则、责任范围和用户内容说明。', u: './terms.html' }
+      ],
+      featuresTitle: '主要功能',
+      features: [
+        '题库刷题：章节、智能、随机多种练习模式',
+        '模拟考试：真题套卷，限时作答、自动判分',
+        '分类学习：按科目与知识分类精准复习',
+        '知识点学习：结构化知识卡片与知识库',
+        'AI 答疑：AI 讲解答疑，每天赠送积分',
+        '错题本：自动收录错题，支持巩固重做',
+        '收藏与笔记：题目、知识点收藏，记录笔记',
+        '数据中心：累计刷题、正确率、打卡统计',
+        '离线练习：下载题库离线刷题',
+        '自定义题库：上传题库文件解析后使用'
+      ],
+      updated: '最后更新：2026-09-02'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="lead">${c.lead1}</p>
+      <p class="lead">${c.lead2}</p>
+      <div class="grid" aria-label="重要页面">
+        ${c.cards.map(x => `<a class="card" href="${x.u}"><strong>${x.h}</strong><span>${x.d}</span></a>`).join('')}
+      </div>
+      <h2>${c.featuresTitle}</h2>
+      <ul class="features">${c.features.map(x => `<li>${x}</li>`).join('')}</ul>
+      <p class="meta">${c.updated}</p>
+    `
+  </script>
+</body>
+</html>
