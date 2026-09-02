@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>派 PAI - 信息聚合与任务派单</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #5f6b73; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2b56ea; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 980px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1 { margin: 0 0 12px; font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: 0; }
+    h2 { margin: 40px 0 12px; font-size: 24px; line-height: 1.25; }
+    p { margin: 0 0 16px; color: var(--muted); }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .lead { max-width: 760px; font-size: 19px; color: #324047; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 30px; }
+    .card { display: block; min-height: 112px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; text-decoration: none; }
+    .card strong { display: block; margin-bottom: 8px; font-size: 18px; }
+    .card span { color: var(--muted); }
+    .features { columns: 2 280px; padding-left: 20px; color: #35424a; }
+    .features li { margin: 0 0 8px; break-inside: avoid; }
+    .meta { margin-top: 36px; font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '派 PAI',
+      lead1: '派 PAI 是一款信息聚合与任务派单平台，帮助你把信息发现、任务派发与沟通协作放在同一个高效工作台里。',
+      lead2: '派 PAI 提供首页信息流、任务派单、分类浏览、精准搜索、消息聊天、内容发布与钱包等功能。',
+      cards: [
+        { h: '隐私政策', d: '了解派 PAI 如何收集、使用和保护你的个人信息。', u: './privacy.html' },
+        { h: '支持与联系', d: '查看常见问题、反馈渠道和提交问题时需要提供的信息。', u: './support.html' },
+        { h: '用户协议', d: '了解派 PAI 的使用规则、责任范围和用户内容说明。', u: './terms.html' }
+      ],
+      featuresTitle: '主要功能',
+      features: [
+        '首页信息流：聚合发布任务与内容',
+        '任务派单：发布任务、派单与接单',
+        '分类浏览：按分类与子分类快速定位',
+        '精准搜索：按关键词快速查找',
+        '消息聊天：与任务方私信沟通',
+        '内容发布：发布任务与信息',
+        '钱包管理：收益与结算集中查看'
+      ],
+      updated: '最后更新：2026-09-02'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="lead">${c.lead1}</p>
+      <p class="lead">${c.lead2}</p>
+      <div class="grid" aria-label="重要页面">
+        ${c.cards.map(x => `<a class="card" href="${x.u}"><strong>${x.h}</strong><span>${x.d}</span></a>`).join('')}
+      </div>
+      <h2>${c.featuresTitle}</h2>
+      <ul class="features">${c.features.map(x => `<li>${x}</li>`).join('')}</ul>
+      <p class="meta">${c.updated}</p>
+    `
+  </script>
+</body>
+</html>
