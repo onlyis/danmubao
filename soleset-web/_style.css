@@ -1,0 +1,26 @@
+:root { color-scheme: light; --ink:#141414; --muted:#61615c; --line:#e3e3de; --paper:#f7f7f2; --accent:#8fb800; --card:#ffffff; }
+* { box-sizing:border-box; }
+body { margin:0; font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; color:var(--ink); background:var(--paper); }
+main { max-width:900px; margin:0 auto; padding:40px 20px 72px; }
+header.site { background:#141414; color:#f3f3f0; }
+header.site .inner { max-width:900px; margin:0 auto; padding:18px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.brand { font-family:ui-monospace,Menlo,monospace; font-weight:700; letter-spacing:-0.4px; font-size:18px; }
+.brand em { color:#c6ff3a; font-style:normal; }
+.lang { display:flex; gap:6px; }
+.lang button { border:1px solid rgba(255,255,255,.25); background:transparent; color:#f3f3f0; padding:5px 12px; border-radius:999px; font-size:13px; cursor:pointer; }
+.lang button.active { background:#c6ff3a; color:#141414; border-color:#c6ff3a; }
+h1 { margin:8px 0 10px; font-size:clamp(30px,5vw,44px); line-height:1.1; }
+h2 { margin:34px 0 10px; font-size:22px; }
+h3 { margin:22px 0 8px; font-size:17px; }
+p, li { color:#3a3a36; }
+ul { padding-left:20px; }
+.meta { margin-top:32px; font-size:13px; color:var(--muted); }
+.card { display:block; padding:16px 18px; border:1px solid var(--line); border-radius:12px; background:var(--card); text-decoration:none; margin-top:12px; }
+.card strong { display:block; margin-bottom:4px; font-size:16px; }
+.card span { color:var(--muted); font-size:14px; }
+table { width:100%; border-collapse:collapse; margin:14px 0; background:var(--card); }
+th, td { border:1px solid var(--line); padding:9px 12px; font-size:14px; text-align:left; vertical-align:top; }
+th { background:#efefe9; }
+footer.site { border-top:1px solid var(--line); margin-top:48px; }
+footer.site .inner { max-width:900px; margin:0 auto; padding:20px; font-size:13px; color:var(--muted); display:flex; gap:18px; flex-wrap:wrap; }
+footer.site a { color:var(--muted); }
