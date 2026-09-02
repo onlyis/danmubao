@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>支持与联系 - 睿账云财税</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2b56ea; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; }
+    h2 { margin: 34px 0 10px; font-size: 22px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .box { padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '支持与联系',
+      subtitle: '适用于睿账云财税 / Ruizhang Finance。最后更新：2026-09-02',
+      intro: '如果你在使用睿账云财税的看板、票据、申报、报表、税企或企业账套等功能时遇到问题，可以通过以下方式联系我们：',
+      email: '邮箱：john@smartnote.ai',
+      issuesTitle: '提交反馈',
+      issuesDesc: '你也可以通过 GitHub Issues 提交问题或建议：',
+      issuesLink: 'https://github.com/onlyis/danmubao/issues',
+      issuesBtn: '打开 GitHub Issues',
+      provideTitle: '反馈时请提供',
+      provide: [
+        '设备型号，例如 iPhone 15 Pro。',
+        'iOS 或 iPadOS 版本。',
+        '睿账云财税版本号。',
+        '问题发生的功能区域，例如看板、票据、申报、报表或税企。',
+        '可复现步骤、预期结果和实际结果。',
+        '如需上传截图，请先遮盖企业名称、纳税人识别号、财务数据或其他敏感信息。'
+      ],
+      faqTitle: '常见问题',
+      faq: [
+        ['如何登录？', '使用机构分配的账号密码登录，也可以使用“随便逛逛”体验模式浏览。'],
+        ['可以管理多个企业吗？', '可以，在“我的”中切换企业并管理多个账套。'],
+        ['数据安全如何保障？', '企业财税数据存储于受保护的服务端并加密传输，按权限向机构内人员开放。'],
+        ['如何保护隐私？', '不要在公开反馈渠道上传企业财务数据、纳税人识别号等敏感信息。'],
+        ['如何注销账号？', '请联系支持邮箱或通过支持页面提交注销申请，我们会在核验后处理。']
+      ],
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 睿账云财税'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <div class="box">
+        <p>${c.intro}</p>
+        <p>${c.email}</p>
+      </div>
+      <h2>${c.issuesTitle}</h2>
+      <p>${c.issuesDesc}</p>
+      <p><a href="${c.issuesLink}">${c.issuesBtn}</a></p>
+      <h2>${c.provideTitle}</h2>
+      <ul>${c.provide.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.faqTitle}</h2>
+      ${c.faq.map(([q, a]) => `<p><strong>${q}</strong><br>${a}</p>`).join('')}
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>

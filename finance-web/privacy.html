@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>隐私政策 - 睿账云财税</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2b56ea; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; letter-spacing: 0; }
+    h2 { margin: 34px 0 10px; font-size: 22px; line-height: 1.3; }
+    h3 { margin: 22px 0 8px; font-size: 18px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .summary { padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '隐私政策',
+      subtitle: '适用于睿账云财税 / Ruizhang Finance。最近更新：2026-09-02',
+      summary: '睿账云财税是一款面向代账机构与企业的财税服务应用。我们通过账号提供服务，处理企业账套、票据、申报等必要信息，仅用于为您提供服务。我们不会向无关第三方出售您的个人信息，也不会用于广告追踪。',
+      s1: '一、我们收集的信息',
+      s1p: '为了向您提供代账、申报、票据等财税服务，我们会在您使用过程中收集以下信息：',
+      s1l: [
+        '账号信息：您的登录账号、手机号、姓名与所属机构信息。',
+        '企业信息：您管理的企业名称、纳税人识别号、账套、税务登记等企业财税信息。',
+        '业务数据：记账凭证、发票票据、纳税申报、财务报表、办税人员等业务数据。',
+        '审批记录：办税流程的审批记录与操作日志。',
+        '设备与日志信息：设备型号、操作系统版本、应用版本、IP 地址、操作时间与基本使用日志，用于保障服务安全和排查问题。',
+        '客服与反馈信息：您在提交反馈或联系客服时提供的联系方式、截图和问题描述。'
+      ],
+      s2: '二、信息的使用',
+      s2p: '我们仅在以下目的范围内使用上述信息：',
+      s2l: [
+        '提供核心服务：记账、申报、票据管理、财务报表与税企服务。',
+        '企业协同：供您与机构内的办税人员共享与协作处理企业财税事务。',
+        '安全保障：识别异常登录、防范数据泄露与滥用。',
+        '服务改进：在去标识化后分析功能使用情况，优化体验。',
+        '法律合规：在法律法规要求时配合监管和司法调查。'
+      ],
+      s3: '三、信息的存储与安全',
+      s3p: '您的数据存储于受访问控制保护的服务端，并在传输过程中使用加密技术。企业财税信息属于敏感业务数据，我们采取严格的账号鉴权、权限分级、审计与加密措施。但没有任何系统能保证绝对安全，建议您妥善保管账号并遵循机构的安全规范。',
+      s4: '四、信息的共享与披露',
+      s4p: '我们不会向无关第三方出售您的个人信息。仅在以下情形下，我们可能共享或披露必要信息：',
+      s4l: [
+        '机构内部：企业财税数据按权限提供给机构内授权的办税人员与管理人员。',
+        '法律要求：在具有有效法律依据时配合监管部门、司法机关的要求。',
+        '您的授权：在获得您明确同意后共享。'
+      ],
+      s5: '五、您的权利',
+      s5l: [
+        '查阅与更正：您可以查看和修改个人资料与所属机构信息。',
+        '访问控制：管理员可管理机构成员的权限与访问范围。',
+        '注销：您可以联系客服申请注销账号，我们会在核验后按合规要求删除或匿名化您的个人信息。',
+        '数据保留：企业财税数据按法律法规要求的期限保留。'
+      ],
+      s6: '六、未成年人保护',
+      s6p: '睿账云财税面向企业财税服务人员，不面向未成年人提供服务。如发现未成年人注册，请联系我们处理。',
+      s7: '七、第三方服务',
+      s7p: '本应用及支持页面可能包含 GitHub Issues 等链接。当您跳转到第三方服务时，该服务会按照其自身的隐私政策处理您的信息。',
+      s8: '八、政策变更',
+      s8p: '当功能变化导致数据处理方式发生实质变化时，我们会更新本页面的“最近更新”日期，并通过应用内提示或版本说明通知您。继续使用即视为接受更新后的政策。',
+      s9: '九、联系我们',
+      s9p: '如您对隐私政策或个人信息处理有任何疑问、要求更正或删除、或希望注销账号，请通过支持页面联系我们：',
+      email: '邮箱：john@smartnote.ai',
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 睿账云财税'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <div class="summary"><p><strong>摘要：</strong>${c.summary}</p></div>
+      <h2>${c.s1}</h2>
+      <p>${c.s1p}</p>
+      <ul>${c.s1l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s2}</h2>
+      <p>${c.s2p}</p>
+      <ul>${c.s2l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s3}</h2>
+      <p>${c.s3p}</p>
+      <h2>${c.s4}</h2>
+      <p>${c.s4p}</p>
+      <ul>${c.s4l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s5}</h2>
+      <ul>${c.s5l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s6}</h2>
+      <p>${c.s6p}</p>
+      <h2>${c.s7}</h2>
+      <p>${c.s7p}</p>
+      <h2>${c.s8}</h2>
+      <p>${c.s8p}</p>
+      <h2>${c.s9}</h2>
+      <p>${c.s9p}</p>
+      <p>${c.email}</p>
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用户协议 - 睿账云财税</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2b56ea; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; }
+    h2 { margin: 34px 0 10px; font-size: 22px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '用户协议',
+      subtitle: '适用于睿账云财税 / Ruizhang Finance。最后更新：2026-09-02',
+      s1: '一、服务说明',
+      s1p: '睿账云财税提供记账、票据管理、纳税申报、财务报表、税企服务、资料文档与企业账套管理等财税服务。具体功能可能随版本更新而调整，请以应用内实际提供为准。',
+      s2: '二、账号与安全',
+      s2p: '您使用机构分配的账号登录本应用，应妥善保管账号和密码，对账号下的行为负责。禁止转借、出售账号，禁止利用他人信息登录。企业财税数据为敏感信息，请遵循机构的安全规范。',
+      s3: '三、用户内容与数据',
+      s3p: '您在睿账云财税中录入或上传的记账凭证、票据、申报与企业资料等数据归相应企业或权利人所有。您需确保拥有处理这些数据的必要权限，并遵守适用法律与企业内部规范。',
+      s4: '四、数据安全与保密',
+      s4p: '企业财税数据属于敏感业务信息，平台采取加密、权限分级与审计等措施保护数据。您应妥善管理账号与数据访问范围，不得在公开渠道传播企业财务数据。',
+      s5: '五、服务与责任',
+      s5p: '平台按“现状”和“可用”基础提供服务，不保证任何功能在所有设备、系统版本或网络环境下完全无错误。财税结果以税务机关及相关法律法规为准，平台不对因使用或无法使用本应用导致的间接损失承担责任。',
+      s6: '六、知识产权',
+      s6p: '睿账云财税的应用界面、代码、图标、设计元素和相关文案受知识产权法律保护。除非法律允许或我们明确授权，您不得复制、修改、反向工程、分发或用于未经授权的商业用途。',
+      s7: '七、协议变更',
+      s7p: '我们可能为修复问题、提升服务、满足 App Store 要求或调整产品方向而更新本协议。变更后继续使用即视为接受更新后的条款。',
+      s8: '八、联系',
+      s8p: '有关本协议或应用使用的问题，可以通过支持页面联系我们：john@smartnote.ai。',
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 睿账云财税'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <h2>${c.s1}</h2><p>${c.s1p}</p>
+      <h2>${c.s2}</h2><p>${c.s2p}</p>
+      <h2>${c.s3}</h2><p>${c.s3p}</p>
+      <h2>${c.s4}</h2><p>${c.s4p}</p>
+      <h2>${c.s5}</h2><p>${c.s5p}</p>
+      <h2>${c.s6}</h2><p>${c.s6p}</p>
+      <h2>${c.s7}</h2><p>${c.s7p}</p>
+      <h2>${c.s8}</h2><p>${c.s8p}</p>
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>
