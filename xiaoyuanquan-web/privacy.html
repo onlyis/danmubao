@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>隐私政策 - 校园圈</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2f66f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; letter-spacing: 0; }
+    h2 { margin: 34px 0 10px; font-size: 22px; line-height: 1.3; }
+    h3 { margin: 22px 0 8px; font-size: 18px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .summary { padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '隐私政策',
+      subtitle: '适用于校园圈 / Xiaoyuanquan。最近更新：2026-09-02',
+      summary: '校园圈是一款校园表白墙与互助社区应用。您可以匿名浏览校园内容，在您发布内容或使用聊天等功能时，我们会处理必要的发布内容、图片等信息，仅用于为您提供服务。我们不会向无关第三方出售您的个人信息，也不会用于广告追踪。',
+      s1: '一、我们收集的信息',
+      s1p: '为了向您提供表白墙、动态分享和社区服务，我们会在您使用过程中收集以下信息：',
+      s1l: [
+        '账号信息：您注册或登录时提供的手机号、昵称（部分功能可匿名使用，可选择不提供账号信息）。',
+        '用户内容：您发布的表白、动态、评论、二手信息，以及上传的图片、相册内容。',
+        '互动信息：您的点赞、收藏、私信聊天内容。',
+        '设备与日志信息：设备型号、操作系统版本、应用版本、IP 地址、操作时间与基本使用日志，用于保障服务安全和排查问题。',
+        '客服与反馈信息：您在提交反馈或联系客服时提供的联系方式、截图和问题描述。'
+      ],
+      s2: '二、信息的使用',
+      s2p: '我们仅在以下目的范围内使用上述信息：',
+      s2l: [
+        '提供核心服务：表白墙展示、动态分享、点赞收藏、私信聊天与社区互动。',
+        '内容审核：对发布的表白、动态等内容进行审核，维护友善、安全的社区环境。',
+        '安全保障：识别异常行为、防范滥用、骚扰和违法行为。',
+        '服务改进：在去标识化后分析功能使用情况，优化体验。',
+        '法律合规：在法律法规要求时配合监管和司法调查。'
+      ],
+      s3: '三、信息的存储与安全',
+      s3p: '您的数据存储于受访问控制保护的服务端，并在传输过程中使用加密技术。我们采取账号鉴权、权限分级、日志审计等措施保护数据，但没有任何系统能保证绝对安全。建议您妥善保管账号，不要向他人透露验证码。',
+      s4: '四、信息的共享与披露',
+      s4p: '我们不会向无关第三方出售您的个人信息。仅在以下情形下，我们可能共享或披露必要信息：',
+      s4l: [
+        '法律要求：在具有有效法律依据时配合监管部门、司法机关的要求。',
+        '您的授权：在获得您明确同意后共享。'
+      ],
+      s5: '五、您的权利',
+      s5l: [
+        '查阅与更正：您可以查看和修改自己的昵称与资料。',
+        '删除：您可以删除自己发布的表白、动态、评论与收藏。',
+        '注销：您可以联系客服申请注销账号，我们会在核验后删除或匿名化您的个人信息。',
+        '匿名使用：您可以选择以匿名方式浏览，无需提供账号信息。'
+      ],
+      s6: '六、未成年人保护',
+      s6p: '校园圈面向校园用户，如您是未成年人，请在监护人指导下使用，并谨慎发布个人信息，避免公开真实姓名、手机号、住址等敏感信息。',
+      s7: '七、第三方服务',
+      s7p: '本应用及支持页面可能包含 GitHub Issues 等链接。当您跳转到第三方服务时，该服务会按照其自身的隐私政策处理您的信息。',
+      s8: '八、政策变更',
+      s8p: '当功能变化导致数据处理方式发生实质变化时，我们会更新本页面的“最近更新”日期，并通过应用内提示或版本说明通知您。继续使用即视为接受更新后的政策。',
+      s9: '九、联系我们',
+      s9p: '如您对隐私政策或个人信息处理有任何疑问、要求更正或删除、或希望注销账号，请通过支持页面联系我们：',
+      email: '邮箱：john@smartnote.ai',
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 校园圈'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <div class="summary"><p><strong>摘要：</strong>${c.summary}</p></div>
+      <h2>${c.s1}</h2>
+      <p>${c.s1p}</p>
+      <ul>${c.s1l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s2}</h2>
+      <p>${c.s2p}</p>
+      <ul>${c.s2l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s3}</h2>
+      <p>${c.s3p}</p>
+      <h2>${c.s4}</h2>
+      <p>${c.s4p}</p>
+      <ul>${c.s4l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s5}</h2>
+      <ul>${c.s5l.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.s6}</h2>
+      <p>${c.s6p}</p>
+      <h2>${c.s7}</h2>
+      <p>${c.s7p}</p>
+      <h2>${c.s8}</h2>
+      <p>${c.s8p}</p>
+      <h2>${c.s9}</h2>
+      <p>${c.s9p}</p>
+      <p>${c.email}</p>
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>

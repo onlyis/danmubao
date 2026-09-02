@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用户协议 - 校园圈</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2f66f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; }
+    h2 { margin: 34px 0 10px; font-size: 22px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '用户协议',
+      subtitle: '适用于校园圈 / Xiaoyuanquan。最后更新：2026-09-02',
+      s1: '一、服务说明',
+      s1p: '校园圈提供校园表白墙、首页信息流、动态分享、社团广场、二手市场、课程、拼车、私信聊天与个人主页等服务。具体功能可能随版本更新而调整，请以应用内实际提供为准。',
+      s2: '二、账号与安全',
+      s2p: '您可选择匿名浏览或注册登录。注册后应妥善保管账号和验证码，对账号下的行为负责。禁止转借、出售账号，禁止利用他人信息注册或登录。',
+      s3: '三、用户内容与行为规范',
+      s3p: '您在校园圈中发布的表白、动态、评论和二手信息等内容归您或相应权利人所有。请勿发布违法、侵权、骚扰、色情、诈骗、欺凌或危害他人安全的内容，请勿在公开内容中泄露他人隐私。我们会对违反规范的内容与账号进行处理。',
+      s4: '四、内容审核',
+      s4p: '为维护友善、安全的校园社区环境，您发布的内容会经过审核后再展示。对违反社区规范的内容，平台有权不予展示或删除。',
+      s5: '五、违规处理',
+      s5p: '平台有权对违反本协议或法律法规的账号进行处理，包括但不限于隐藏内容、限制功能、封禁账号等。',
+      s6: '六、免责声明',
+      s6p: '校园圈按“现状”和“可用”基础提供服务，不保证任何功能在所有设备、系统版本或网络环境下完全无错误。用户发布的内容由发布者负责，平台通过审核与风控降低风险，但无法对用户线下的行为负责。除适用法律不能排除的责任外，平台不对因使用或无法使用本应用导致的间接损失、数据丢失承担责任。',
+      s7: '七、知识产权',
+      s7p: '校园圈的应用界面、代码、图标、设计元素和相关文案受知识产权法律保护。除非法律允许或我们明确授权，您不得复制、修改、反向工程、分发或用于未经授权的商业用途。',
+      s8: '八、协议变更',
+      s8p: '我们可能为修复问题、提升服务、满足 App Store 要求或调整产品方向而更新本协议。变更后继续使用即视为接受更新后的条款。',
+      s9: '九、联系',
+      s9p: '有关本协议或应用使用的问题，可以通过支持页面联系我们：john@smartnote.ai。',
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 校园圈'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <h2>${c.s1}</h2><p>${c.s1p}</p>
+      <h2>${c.s2}</h2><p>${c.s2p}</p>
+      <h2>${c.s3}</h2><p>${c.s3p}</p>
+      <h2>${c.s4}</h2><p>${c.s4p}</p>
+      <h2>${c.s5}</h2><p>${c.s5p}</p>
+      <h2>${c.s6}</h2><p>${c.s6p}</p>
+      <h2>${c.s7}</h2><p>${c.s7p}</p>
+      <h2>${c.s8}</h2><p>${c.s8p}</p>
+      <h2>${c.s9}</h2><p>${c.s9p}</p>
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>

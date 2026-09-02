@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>支持与联系 - 校园圈</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2f66f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; }
+    h2 { margin: 34px 0 10px; font-size: 22px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .box { padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '支持与联系',
+      subtitle: '适用于校园圈 / Xiaoyuanquan。最后更新：2026-09-02',
+      intro: '如果你在使用校园圈的表白墙、动态、社团、二手市场、课程、拼车、消息或发布等功能时遇到问题，可以通过以下方式联系我们：',
+      email: '邮箱：john@smartnote.ai',
+      issuesTitle: '提交反馈',
+      issuesDesc: '你也可以通过 GitHub Issues 提交问题或建议：',
+      issuesLink: 'https://github.com/onlyis/danmubao/issues',
+      issuesBtn: '打开 GitHub Issues',
+      provideTitle: '反馈时请提供',
+      provide: [
+        '设备型号，例如 iPhone 15 Pro。',
+        'iOS 或 iPadOS 版本。',
+        '校园圈版本号。',
+        '问题发生的功能区域，例如表白墙、动态、社团、二手市场或消息。',
+        '可复现步骤、预期结果和实际结果。',
+        '如需上传截图，请先遮盖手机号、个人信息或其他敏感内容。'
+      ],
+      faqTitle: '常见问题',
+      faq: [
+        ['需要登录才能浏览吗？', '不需要，你可以匿名浏览校园内容；发布内容或聊天时再选择登录或注册。'],
+        ['如何发布表白？', '进入“广场”或点击底部“发布”按钮，填写内容即可发布，可选择匿名或署名。'],
+        ['内容审核是怎样的？', '发布的表白、动态等会经过审核，符合社区规范后展示。'],
+        ['如何保护隐私？', '建议不要在公开内容中泄露真实姓名、手机号、住址等敏感信息；可以选择匿名发布。'],
+        ['如何删除自己发布的内容？', '在个人主页找到对应内容进行删除，或联系支持处理。'],
+        ['如何注销账号？', '请联系支持邮箱或通过支持页面提交注销申请，我们会在核验后处理。']
+      ],
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 校园圈'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <div class="box">
+        <p>${c.intro}</p>
+        <p>${c.email}</p>
+      </div>
+      <h2>${c.issuesTitle}</h2>
+      <p>${c.issuesDesc}</p>
+      <p><a href="${c.issuesLink}">${c.issuesBtn}</a></p>
+      <h2>${c.provideTitle}</h2>
+      <ul>${c.provide.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.faqTitle}</h2>
+      ${c.faq.map(([q, a]) => `<p><strong>${q}</strong><br>${a}</p>`).join('')}
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>
