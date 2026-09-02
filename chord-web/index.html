@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>乐谱社区 - 曲谱与练习</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #5f6b73; --line: #d9e0e4; --paper: #fbfcfb; --accent: #c5a572; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 980px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1 { margin: 0 0 12px; font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: 0; }
+    h2 { margin: 40px 0 12px; font-size: 24px; line-height: 1.25; }
+    p { margin: 0 0 16px; color: var(--muted); }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .lead { max-width: 760px; font-size: 19px; color: #324047; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 30px; }
+    .card { display: block; min-height: 112px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; text-decoration: none; }
+    .card strong { display: block; margin-bottom: 8px; font-size: 18px; }
+    .card span { color: var(--muted); }
+    .features { columns: 2 280px; padding-left: 20px; color: #35424a; }
+    .features li { margin: 0 0 8px; break-inside: avoid; }
+    .meta { margin-top: 36px; font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '乐谱社区',
+      lead1: '乐谱社区是一款面向音乐爱好者的曲谱浏览与练习应用，海量曲谱在线看，随时随地进行乐谱练习。',
+      lead2: '乐谱社区提供曲谱浏览与搜索、分类谱库、曲谱详情、移调与变速练习、社区动态、收藏与会员等功能。',
+      cards: [
+        { h: '隐私政策', d: '了解乐谱社区如何收集、使用和保护你的个人信息。', u: './privacy.html' },
+        { h: '支持与联系', d: '查看常见问题、反馈渠道和提交问题时需要提供的信息。', u: './support.html' },
+        { h: '用户协议', d: '了解乐谱社区的使用规则、责任范围和用户内容说明。', u: './terms.html' }
+      ],
+      featuresTitle: '主要功能',
+      features: [
+        '曲谱浏览：海量钢琴、吉他等曲谱',
+        '精准搜索：按曲名、作曲家、关键词查找',
+        '曲谱详情：高清曲谱，移调变速与节拍器',
+        '在线练习：跟谱练习，阅读自动滚动',
+        '社区动态：发布曲谱与心得，参与话题',
+        '收藏与排行：收藏曲谱，查看热门与排行',
+        '会员服务：全部曲谱免费下载与高级练习'
+      ],
+      updated: '最后更新：2026-09-02'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="lead">${c.lead1}</p>
+      <p class="lead">${c.lead2}</p>
+      <div class="grid" aria-label="重要页面">
+        ${c.cards.map(x => `<a class="card" href="${x.u}"><strong>${x.h}</strong><span>${x.d}</span></a>`).join('')}
+      </div>
+      <h2>${c.featuresTitle}</h2>
+      <ul class="features">${c.features.map(x => `<li>${x}</li>`).join('')}</ul>
+      <p class="meta">${c.updated}</p>
+    `
+  </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用户协议 - 乐谱社区</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #c5a572; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; }
+    h2 { margin: 34px 0 10px; font-size: 22px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '用户协议',
+      subtitle: '适用于乐谱社区 / Yuepu Community。最后更新：2026-09-02',
+      s1: '一、服务说明',
+      s1p: '乐谱社区提供曲谱浏览、搜索、在线练习、社区动态、收藏、排行与会员等服务。具体功能可能随版本更新而调整，请以应用内实际提供为准。',
+      s2: '二、账号与安全',
+      s2p: '您注册并登录本应用，应妥善保管账号和密码，对账号下的行为负责。禁止转借、出售账号，禁止利用他人信息注册或登录。',
+      s3: '三、用户内容与知识产权',
+      s3p: '您在乐谱社区中发布的动态、评论和上传的曲谱等内容归您或相应权利人所有。您需确保拥有发布这些内容的必要权利，并遵守适用法律及著作权规范。请勿发布违法、侵权、骚扰或危害他人安全的内容。',
+      s4: '四、会员与退款',
+      s4p: '会员为虚拟服务，开通后即视为交易完成。请在下单前确认权益范围。如遇支付异常、重复扣款或其他客观问题，请及时联系支持，我们会在核实后按实际情况处理。',
+      s5: '五、违规处理',
+      s5p: '平台有权对违反本协议或法律法规的账号进行处理，包括但不限于隐藏内容、限制功能、封禁账号等。',
+      s6: '六、免责声明',
+      s6p: '乐谱社区按“现状”和“可用”基础提供服务，不保证任何功能在所有设备、系统版本或网络环境下完全无错误。曲谱内容可能存在疏漏，请以原版乐谱为准。除适用法律不能排除的责任外，平台不对因使用或无法使用本应用导致的间接损失、数据丢失承担责任。',
+      s7: '七、知识产权',
+      s7p: '乐谱社区的应用界面、代码、图标、设计元素和相关文案受知识产权法律保护。除非法律允许或我们明确授权，您不得复制、修改、反向工程、分发或用于未经授权的商业用途。',
+      s8: '八、协议变更',
+      s8p: '我们可能为修复问题、提升服务、满足 App Store 要求或调整产品方向而更新本协议。变更后继续使用即视为接受更新后的条款。',
+      s9: '九、联系',
+      s9p: '有关本协议或应用使用的问题，可以通过支持页面联系我们：john@smartnote.ai。',
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 乐谱社区'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <h2>${c.s1}</h2><p>${c.s1p}</p>
+      <h2>${c.s2}</h2><p>${c.s2p}</p>
+      <h2>${c.s3}</h2><p>${c.s3p}</p>
+      <h2>${c.s4}</h2><p>${c.s4p}</p>
+      <h2>${c.s5}</h2><p>${c.s5p}</p>
+      <h2>${c.s6}</h2><p>${c.s6p}</p>
+      <h2>${c.s7}</h2><p>${c.s7p}</p>
+      <h2>${c.s8}</h2><p>${c.s8p}</p>
+      <h2>${c.s9}</h2><p>${c.s9p}</p>
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>
