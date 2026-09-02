@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>群多多 - 跨平台找群</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #5f6b73; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2f66f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 980px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1 { margin: 0 0 12px; font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: 0; }
+    h2 { margin: 40px 0 12px; font-size: 24px; line-height: 1.25; }
+    p { margin: 0 0 16px; color: var(--muted); }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .lead { max-width: 760px; font-size: 19px; color: #324047; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 30px; }
+    .card { display: block; min-height: 112px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; text-decoration: none; }
+    .card strong { display: block; margin-bottom: 8px; font-size: 18px; }
+    .card span { color: var(--muted); }
+    .features { columns: 2 280px; padding-left: 20px; color: #35424a; }
+    .features li { margin: 0 0 8px; break-inside: avoid; }
+    .meta { margin-top: 36px; font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '群多多',
+      lead1: '群多多是一款跨平台找群、加群和发布群组的应用。你可以浏览和搜索感兴趣的群组，扫码即可加入，群主也可以快速发布自己的群，让更多同好找到你。',
+      lead2: '群多多提供首页精选信息流、分类找群、精准搜索、群详情、付费群解锁、创作收益、群主认证和消息通知等功能。',
+      cards: [
+        { h: '隐私政策', d: '了解群多多如何收集、使用和保护你的个人信息。', u: './privacy.html' },
+        { h: '支持与联系', d: '查看常见问题、反馈渠道和提交问题时需要提供的信息。', u: './support.html' },
+        { h: '用户协议', d: '了解群多多的使用规则、责任范围和用户内容说明。', u: './terms.html' }
+      ],
+      featuresTitle: '主要功能',
+      features: [
+        '首页信息流：浏览精选群组，按热度、最新或推荐排序',
+        '分类找群：游戏、学习、兴趣、职场、同城等分类',
+        '精准搜索：按关键词快速定位想要的群',
+        '群详情：查看群介绍、成员规模、标签和加入方式',
+        '扫码加入：展示群二维码，扫码即可入群',
+        '发布群组：群主快速发布自己的群',
+        '付费群解锁：在线支付后立即解锁',
+        '创作收益与提现：群主发布群组积累收益',
+        '群主认证：认证后群展示更靠前',
+        '消息通知：入群、互动、收益变动及时提醒'
+      ],
+      updated: '最后更新：2026-09-02'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="lead">${c.lead1}</p>
+      <p class="lead">${c.lead2}</p>
+      <div class="grid" aria-label="重要页面">
+        ${c.cards.map(x => `<a class="card" href="${x.u}"><strong>${x.h}</strong><span>${x.d}</span></a>`).join('')}
+      </div>
+      <h2>${c.featuresTitle}</h2>
+      <ul class="features">${c.features.map(x => `<li>${x}</li>`).join('')}</ul>
+      <p class="meta">${c.updated}</p>
+    `
+  </script>
+</body>
+</html>

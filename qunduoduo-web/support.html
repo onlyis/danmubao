@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>支持与联系 - 群多多</title>
+  <style>
+    :root { color-scheme: light; --ink: #172026; --muted: #53616a; --line: #d9e0e4; --paper: #fbfcfb; --accent: #2f66f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 900px; margin: 0 auto; padding: 42px 20px 76px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.16; }
+    h2 { margin: 34px 0 10px; font-size: 22px; }
+    p, li { color: var(--muted); }
+    p { margin: 0 0 13px; }
+    ul { margin: 0 0 14px 20px; padding: 0; }
+    li { margin-bottom: 8px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .box { padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .muted { font-size: 14px; color: #71808a; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    const ZH = {
+      title: '支持与联系',
+      subtitle: '适用于群多多 / Qunduoduo。最后更新：2026-09-02',
+      intro: '如果你在使用群多多的找群、加群、发布群组、付费解锁、创作收益或提现等功能时遇到问题，可以通过以下方式联系我们：',
+      email: '邮箱：john@smartnote.ai',
+      issuesTitle: '提交反馈',
+      issuesDesc: '你也可以通过 GitHub Issues 提交问题或建议：',
+      issuesLink: 'https://github.com/onlyis/danmubao/issues',
+      issuesBtn: '打开 GitHub Issues',
+      provideTitle: '反馈时请提供',
+      provide: [
+        '设备型号，例如 iPhone 15 Pro。',
+        'iOS 或 iPadOS 版本。',
+        '群多多版本号。',
+        '问题发生的功能区域，例如找群、加群、发布、付费解锁、收益或提现。',
+        '可复现步骤、预期结果和实际结果。',
+        '如需上传截图，请先遮盖手机号、支付信息、群二维码或其他敏感信息。'
+      ],
+      faqTitle: '常见问题',
+      faq: [
+        ['如何加入群组？', '在群详情页查看群介绍和加入方式，使用对应平台的二维码或链接扫码即可入群。'],
+        ['付费群解锁后可以退款吗？', '付费群解锁后即视为交易完成，请在购买前确认群组信息。如遇异常，请联系支持。'],
+        ['创作收益如何提现？', '群主发布群组可积累创作收益，在“我的-钱包”中查看余额并申请提现。'],
+        ['如何保护隐私？', '不要向他人透露验证码，不要在公开反馈渠道上传原始群二维码、支付截图或敏感个人信息。'],
+        ['如何注销账号？', '请联系支持邮箱或通过支持页面提交注销申请，我们会在核验后处理。']
+      ],
+      back: '返回首页'
+    }
+    const EN = Object.assign({}, ZH)
+    const isZh = /^zh/i.test(navigator.language || '')
+    const c = isZh ? ZH : EN
+    document.documentElement.lang = isZh ? 'zh-CN' : 'en'
+    document.title = c.title + ' - 群多多'
+    document.getElementById('app').innerHTML = `
+      <h1>${c.title}</h1>
+      <p class="muted">${c.subtitle}</p>
+      <div class="box">
+        <p>${c.intro}</p>
+        <p>${c.email}</p>
+      </div>
+      <h2>${c.issuesTitle}</h2>
+      <p>${c.issuesDesc}</p>
+      <p><a href="${c.issuesLink}">${c.issuesBtn}</a></p>
+      <h2>${c.provideTitle}</h2>
+      <ul>${c.provide.map(x => `<li>${x}</li>`).join('')}</ul>
+      <h2>${c.faqTitle}</h2>
+      ${c.faq.map(([q, a]) => `<p><strong>${q}</strong><br>${a}</p>`).join('')}
+      <p><a href="./index.html">${c.back}</a></p>
+    `
+  </script>
+</body>
+</html>
